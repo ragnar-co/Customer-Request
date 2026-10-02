@@ -1,0 +1,213 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "./ddd-schema.json",
+  "title": "DDD Documentation Framework Schema",
+  "description": "JSON Schema for DDD files (ddd-web-app-v2.4.0.json, ddd-data-analytics-v2.4.0.json, ddd-ai-workflow-v1.3.0.json, ddd-database-design-v1.1.0.json, ddd-chatbot-v1.0.0.json).",
+  "type": "object",
+  "required": ["meta", "phases", "deliverables"],
+  "additionalProperties": false,
+  "properties": {
+    "$id": { "type": "string" },
+    "$schema": { "type": "string" },
+    "meta": { "$ref": "#/definitions/meta" },
+    "phases": {
+      "type": "array",
+      "items": { "$ref": "#/definitions/phase" },
+      "minItems": 1
+    },
+    "deliverables": { "$ref": "#/definitions/deliverables" }
+  },
+  "definitions": {
+    "bilingualString": {
+      "type": "object",
+      "required": ["th", "en"],
+      "additionalProperties": false,
+      "properties": {
+        "th": { "type": "string" },
+        "en": { "type": "string" }
+      }
+    },
+    "item": {
+      "type": "object",
+      "required": ["text_th", "text_en"],
+      "additionalProperties": false,
+      "properties": {
+        "text_th": { "type": "string" },
+        "text_en": { "type": "string" },
+        "refs": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      }
+    },
+    "section": {
+      "type": "object",
+      "required": ["id", "heading", "description", "refs", "items"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string", "pattern": "^[a-z][a-z0-9_]*$" },
+        "heading": { "type": "string" },
+        "description": { "$ref": "#/definitions/bilingualString" },
+        "refs": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "items": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/item" },
+          "minItems": 1
+        }
+      }
+    },
+    "outputFormat": {
+      "type": "object",
+      "required": ["type", "suggested_headings"],
+      "additionalProperties": false,
+      "properties": {
+        "type": { "type": "string", "enum": ["markdown", "json", "yaml"] },
+        "suggested_headings": {
+          "type": "array",
+          "items": { "type": "string" },
+          "minItems": 1
+        }
+      }
+    },
+    "agentHints": {
+      "type": "object",
+      "required": ["instruction", "input_context", "estimated_length", "validation"],
+      "additionalProperties": false,
+      "properties": {
+        "instruction": { "type": "string" },
+        "input_context": { "type": "string" },
+        "estimated_length": { "type": "string" },
+        "validation": { "type": "string" }
+      }
+    },
+    "document": {
+      "type": "object",
+      "required": ["id", "filename", "title", "description", "priority", "depends_on", "output_format", "agent_hints", "sections"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string", "pattern": "^[a-z][a-z0-9_]*$" },
+        "filename": { "type": "string", "pattern": "^[A-Z_]+\\.md$" },
+        "aliases": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "title": { "type": "string" },
+        "description": { "$ref": "#/definitions/bilingualString" },
+        "priority": { "type": "string", "enum": ["P0", "P1", "P2"] },
+        "depends_on": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "output_format": { "$ref": "#/definitions/outputFormat" },
+        "agent_hints": { "$ref": "#/definitions/agentHints" },
+        "sections": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/section" },
+          "minItems": 1
+        }
+      }
+    },
+    "phase": {
+      "type": "object",
+      "required": ["id", "order", "title", "description", "documents"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string", "pattern": "^[a-z][a-z0-9_]*$" },
+        "order": { "type": "integer", "minimum": 1 },
+        "title": { "$ref": "#/definitions/bilingualString" },
+        "description": { "$ref": "#/definitions/bilingualString" },
+        "documents": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/document" },
+          "minItems": 1
+        }
+      }
+    },
+    "artifact": {
+      "type": "object",
+      "required": ["id", "title", "items"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string", "pattern": "^[a-z][a-z0-9_]*$" },
+        "title": { "$ref": "#/definitions/bilingualString" },
+        "items": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/item" },
+          "minItems": 1
+        }
+      }
+    },
+    "readinessGate": {
+      "type": "object",
+      "required": ["id", "title", "checklist"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string", "pattern": "^[a-z][a-z0-9_]*$" },
+        "title": { "$ref": "#/definitions/bilingualString" },
+        "checklist": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/item" },
+          "minItems": 1
+        }
+      }
+    },
+    "deliverables": {
+      "type": "object",
+      "required": ["title", "description", "artifacts", "readiness_gates"],
+      "additionalProperties": false,
+      "properties": {
+        "title": { "$ref": "#/definitions/bilingualString" },
+        "description": { "$ref": "#/definitions/bilingualString" },
+        "artifacts": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/artifact" },
+          "minItems": 1
+        },
+        "readiness_gates": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/readinessGate" },
+          "minItems": 1
+        }
+      }
+    },
+    "agentInstructions": {
+      "type": "object",
+      "required": ["role", "generation_order_strategy", "content_language", "quality_gate"],
+      "additionalProperties": false,
+      "properties": {
+        "role": { "type": "string" },
+        "generation_order_strategy": { "type": "string" },
+        "content_language": { "type": "string" },
+        "quality_gate": { "type": "string" },
+        "domain_specific_notes": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      }
+    },
+    "meta": {
+      "type": "object",
+      "required": ["id", "version", "title", "description", "language", "output_dir", "generation_order", "agent_instructions"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string", "pattern": "^[a-z][a-z0-9_-]*$" },
+        "version": { "type": "string", "pattern": "^\\d+\\.\\d+\\.\\d+$" },
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "language": { "type": "string" },
+        "output_dir": { "type": "string" },
+        "domain": { "type": "string" },
+        "applicable_when": { "type": "string" },
+        "generation_order": {
+          "type": "array",
+          "items": { "type": "string" },
+          "minItems": 1
+        },
+        "agent_instructions": { "$ref": "#/definitions/agentInstructions" }
+      }
+    }
+  }
+}

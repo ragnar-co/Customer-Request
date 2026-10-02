@@ -1,0 +1,17 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+.pytest_cache/
+
+# Environment
+.env
+
+# Runtime data — do not commit customer data or local DB state
+input/*.csv
+output/*.duckdb
+!input/.gitkeep
+!output/.gitkeep
+
+# OS
+.DS_Store

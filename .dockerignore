@@ -1,0 +1,14 @@
+.git
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.env
+.env.example
+.DS_Store
+.claude
+README.md
+
+docs/
+input/*.csv
+output/

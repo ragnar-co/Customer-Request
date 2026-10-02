@@ -1,0 +1,1537 @@
+{
+  "$id": "ddd-database-design-v1.1.0.json",
+  "$schema": "./ddd-schema.json",
+  "meta": {
+    "id": "ddd-database-design-v1",
+    "version": "1.1.0",
+    "title": "PostgreSQL Database Design Documents",
+    "description": "DDD documentation framework for PostgreSQL database design projects. AI reads this file and generates .md files covering logical modeling, PG-specific physical design (extensions, partitioning, RLS, indexes), migration tooling, and operational readiness.",
+    "language": "th+en",
+    "output_dir": "docs/",
+    "domain": "postgresql_database_design",
+    "applicable_when": "Designing a new PostgreSQL database or refactoring an existing schema where the database is the primary deliverable — not a supporting component of a web app. Use when the project involves physical PG design decisions: index type selection (B-tree/GIN/GiST/BRIN), declarative partitioning, Row-Level Security, pg_audit, PITR, pgTAP testing, and zero-downtime DDL migrations. Distinct from ddd-web-app DATA_MODEL.md which treats the database as one of many components.",
+    "generation_order": [
+      "stakeholders",
+      "constraints",
+      "access_patterns",
+      "domain_model",
+      "glossary",
+      "erd",
+      "data_dictionary",
+      "normalization",
+      "schema_spec",
+      "indexing_strategy",
+      "partitioning",
+      "security",
+      "migration_strategy",
+      "data_lifecycle",
+      "testing_strategy",
+      "changelog",
+      "runbook",
+      "readme"
+    ],
+    "agent_instructions": {
+      "role": "You are a PostgreSQL database design documentation generator. Read this file and produce each document listed in phases[], in dependency order. Each document must reference content from its depends_on[] documents — do not generate generic content.",
+      "generation_order_strategy": "Topological sort by depends_on graph. Phase 1 (Requirements) has no upstream deps — generate first. Phase 2 (Logical Design) translates business requirements into a relational model. Phase 3 (Physical Design) maps the logical model to PostgreSQL-specific DDL, indexes, partitions, and security. Phase 4 (Operations) prepares for deployment, testing, and production. Never generate a Phase 3 document before its Phase 2 prerequisites are complete.",
+      "content_language": "Write narrative content in Thai. Use English for all identifiers, SQL, DDL, column names, table names, schema names, PostgreSQL extension names, index names, role names, function names, and technical jargon (B-tree, GIN, GiST, BRIN, RLS, PITR, WAL, MVCC, TOAST, pgTAP, pg_audit, pg_stat_statements, pgBackRest). Preserve PG-specific terms in English even inside Thai sentences.",
+      "quality_gate": "Each document must cover all sections[] listed. Every table in SCHEMA_SPEC.md must trace back to an entity in ERD.md. Every column must have an entry in DATA_DICTIONARY.md. Every index in INDEXING_STRATEGY.md must reference a table in SCHEMA_SPEC.md and a query pattern in ACCESS_PATTERNS.md. Every RLS policy in SECURITY.md must name the actual role and table. Validate that all refs[] in sections resolve to real document IDs before writing.",
+      "domain_specific_notes": [
+        "Database Design is not Web App design. There is no UI, no API layer, no deployment pipeline. The deliverable is a PostgreSQL schema — DDL scripts, migration files, and operational runbooks.",
+        "SCHEMA_SPEC.md is the equivalent of ARCHITECTURE.md in the web-app template. It is the single source of truth for the physical database structure including extensions, schemas, custom types, tables, constraints, triggers, and functions.",
+        "ACCESS_PATTERNS.md replaces the web-app PRD as the primary demand signal. Query patterns, hot paths, and read/write ratios drive every indexing and partitioning decision. Generate it before any physical design document.",
+        "The web-app DATA_MODEL.md expands into 4 separate documents here: DOMAIN_MODEL.md (business concepts), ERD.md (entity relationships), DATA_DICTIONARY.md (field-level canonical definitions), NORMALIZATION.md (design rationale and denormalization decisions).",
+        "INDEXING_STRATEGY.md is PostgreSQL-specific: use B-tree for equality/range, GIN for jsonb/array/tsvector/pg_trgm, GiST for geometry/range types/exclusion constraints, BRIN for append-only time-series tables, Hash for equality-only (rare). Always use CREATE INDEX CONCURRENTLY in production.",
+        "SECURITY.md focuses on PostgreSQL-native security: Row-Level Security (RLS) with USING/WITH CHECK policies, column-level GRANT/REVOKE, pg_audit configuration, pgcrypto for column-level encryption. Application-layer auth (JWT, OAuth) is out of scope.",
+        "TESTING_STRATEGY.md uses pgTAP as the primary framework — not pytest or Jest. pgTAP tests run inside PostgreSQL and can test constraints, triggers, functions, and RLS policies at the database level.",
+        "MIGRATION_STRATEGY.md covers zero-downtime DDL patterns specific to PostgreSQL: CREATE INDEX CONCURRENTLY (no table lock), ALTER TABLE ADD COLUMN with DEFAULT (PG 11+ instant), safe NOT NULL addition, online column type changes via new-column-backfill-rename pattern.",
+        "Storage, IOPS, and connection pool capacity are the primary resource constraints — not cloud compute cost. Track these in CONSTRAINTS.md, not as an afterthought."
+      ]
+    }
+  },
+  "phases": [
+    {
+      "id": "phase_requirements",
+      "order": 1,
+      "title": { "th": "Requirements & Context", "en": "Requirements & Context" },
+      "description": {
+        "th": "เป้าหมาย: ทำความเข้าใจว่าใครใช้ข้อมูล มีข้อจำกัดอะไร และ query patterns เป็นอย่างไร ก่อนเริ่มออกแบบ schema",
+        "en": "Goal: Understand who uses the data, what constraints exist, and what query patterns look like — before designing any schema."
+      },
+      "documents": [
+        {
+          "id": "stakeholders",
+          "filename": "STAKEHOLDERS.md",
+          "title": "Stakeholders & Data Consumers",
+          "description": {
+            "th": "ระบุทุก consumer ของ database — บุคคล, แอปพลิเคชัน, และ service — พร้อม access method, read/write profile, และ connection requirements",
+            "en": "Identifies every consumer of the database — humans, applications, and services — with access method, read/write profile, and connection requirements."
+          },
+          "priority": "P0",
+          "depends_on": [],
+          "output_format": {
+            "type": "markdown",
+            "suggested_headings": ["Stakeholder Profiles", "Application Consumers", "Data Ownership Matrix"]
+          },
+          "agent_hints": {
+            "instruction": "Generate a STAKEHOLDERS.md identifying every consumer of the database. For human stakeholders include: name/role, team, data access method (psql CLI, ORM, BI tool, read replica), read/write profile, and data sensitivity clearance level. For application consumers: app name, tech stack, connection method (pgbouncer/pgpool/direct), owned schemas, expected peak concurrency, and connection pool size. For the Data Ownership Matrix: map each domain/schema to a Data Owner (responsible for correctness) and Data Steward (responsible for access governance).",
+            "input_context": "This is a root document with no upstream dependencies. Gather information from project stakeholders directly. The output drives SECURITY.md (which roles to create, which tables need RLS), PARTITIONING.md (which queries are hot), and SCHEMA_SPEC.md (which schemas to create per bounded context).",
+            "estimated_length": "400-700 words",
+            "validation": "Each human stakeholder must have: role, access_method, read_write_profile. Each application consumer must have: app_name, connection_method, peak_concurrency. Data Ownership Matrix must cover every domain planned for the database."
+          },
+          "sections": [
+            {
+              "id": "stakeholder_profiles",
+              "heading": "Stakeholder Profiles",
+              "description": { "th": "บุคคลที่ใช้ database โดยตรง — DBA, developer, analyst, business user", "en": "Human users who access the database directly." },
+              "refs": [],
+              "items": [
+                { "text_th": "ชื่อ/Role และ team ของ stakeholder", "text_en": "Stakeholder name/role and team" },
+                { "text_th": "วิธี access ข้อมูล (psql CLI, ORM, BI tool, read replica)", "text_en": "Data access method (psql CLI, ORM, BI tool, read replica)" },
+                { "text_th": "Read vs Write profile (read-only, read-heavy, write-heavy, mixed)", "text_en": "Read/write profile (read-only, read-heavy, write-heavy, mixed)" },
+                { "text_th": "ระดับ data sensitivity clearance", "text_en": "Data sensitivity clearance level" }
+              ]
+            },
+            {
+              "id": "application_consumers",
+              "heading": "Application Consumers",
+              "description": { "th": "แอปพลิเคชันและ service ที่ read/write database", "en": "Applications and services that read/write the database." },
+              "refs": [],
+              "items": [
+                { "text_th": "ชื่อแอปและ tech stack (Django, Go, Node.js, etc.)", "text_en": "Application name and tech stack" },
+                { "text_th": "Connection method (pgbouncer, pgpool, direct, connection string)", "text_en": "Connection method (pgbouncer, pgpool, direct)" },
+                { "text_th": "Schemas/tables ที่ application เป็นเจ้าของ", "text_en": "Owned schemas and tables" },
+                { "text_th": "Peak concurrent connections ที่คาดการณ์", "text_en": "Expected peak concurrent connections" }
+              ]
+            },
+            {
+              "id": "data_ownership",
+              "heading": "Data Ownership Matrix",
+              "description": { "th": "ระบุว่าใครเป็นเจ้าของแต่ละ domain/schema", "en": "Maps each domain/schema to an owner and steward." },
+              "refs": [],
+              "items": [
+                { "text_th": "ชื่อ domain/schema", "text_en": "Domain/schema name" },
+                { "text_th": "Data Owner — ผู้รับผิดชอบความถูกต้องของข้อมูล", "text_en": "Data Owner — responsible for data correctness" },
+                { "text_th": "Data Steward — ผู้รับผิดชอบ access governance", "text_en": "Data Steward — responsible for access governance" },
+                { "text_th": "Escalation contact สำหรับ schema changes", "text_en": "Escalation contact for schema changes" }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "constraints",
+          "filename": "CONSTRAINTS.md",
+          "title": "Database Constraints",
+          "description": {
+            "th": "ข้อจำกัดที่ไม่สามารถเปลี่ยนแปลงได้ — PG version, scale, PDPA, HA/DR, budget",
+            "en": "Non-negotiable constraints covering PG version, scale projections, PDPA compliance, HA/DR targets, and budget."
+          },
+          "priority": "P0",
+          "depends_on": [],
+          "output_format": {
+            "type": "markdown",
+            "suggested_headings": ["PostgreSQL Version & Extensions", "Scale & Performance Constraints", "Compliance & PDPA Constraints", "High Availability & DR Constraints", "Budget & Timeline"]
+          },
+          "agent_hints": {
+            "instruction": "Generate a CONSTRAINTS.md documenting all non-negotiable constraints. Cover: (1) PG major version + cloud provider (AWS RDS, Cloud SQL, Supabase, self-hosted) and required extensions; (2) scale projections — table row counts at 1yr/3yr, IOPS budget, storage budget, max concurrent connections; (3) PDPA compliance — data classification levels, retention periods, audit trail requirements, data subject rights; (4) HA/DR — RPO and RTO as numeric values, replication type, number of replicas; (5) budget and timeline. Every constraint must be stated as a testable, numeric requirement where possible.",
+            "input_context": "Root document — no upstream dependencies. These constraints feed into every downstream design decision: PG version determines safe DDL patterns (MIGRATION_STRATEGY.md), scale determines partitioning candidates (PARTITIONING.md), PDPA drives column classification (SECURITY.md).",
+            "estimated_length": "600-900 words",
+            "validation": "Must specify PG major version. RPO and RTO must be numeric (e.g., RPO ≤ 5 min, RTO ≤ 30 min). PDPA section must define at least 3 sensitivity levels. Scale constraints must include row count projections for the largest table."
+          },
+          "sections": [
+            {
+              "id": "pg_version_extensions",
+              "heading": "PostgreSQL Version & Extensions",
+              "description": { "th": "PG version ที่ใช้และ extensions ที่ต้องการ", "en": "PostgreSQL version and required extensions." },
+              "refs": [],
+              "items": [
+                { "text_th": "PG major version และ minor version pin (เช่น 16.3)", "text_en": "PG major version and minor version pin (e.g., 16.3)" },
+                { "text_th": "Cloud provider และ managed service constraints (RDS, Cloud SQL, Supabase, self-hosted)", "text_en": "Cloud provider and managed service constraints" },
+                { "text_th": "Required extensions พร้อม version (pg_trgm, postgis, pgvector, pgcrypto, pg_audit, uuid-ossp, pg_stat_statements)", "text_en": "Required extensions with versions" },
+                { "text_th": "Forbidden extensions หรือ features ที่ provider ไม่รองรับ", "text_en": "Forbidden extensions or features not supported by the provider" }
+              ]
+            },
+            {
+              "id": "scale_constraints",
+              "heading": "Scale & Performance Constraints",
+              "description": { "th": "ขนาดข้อมูล, IOPS budget, connection pool limits", "en": "Data volume, IOPS budget, and connection pool limits." },
+              "refs": [],
+              "items": [
+                { "text_th": "Row count ของ largest table ที่ 1yr และ 3yr", "text_en": "Largest table projected row count at 1yr and 3yr" },
+                { "text_th": "IOPS budget (read/write แยก)", "text_en": "IOPS budget (read and write separately)" },
+                { "text_th": "Storage budget (GB/TB)", "text_en": "Storage budget (GB/TB)" },
+                { "text_th": "Max concurrent connections และ connection pooler config", "text_en": "Max concurrent connections and connection pooler config" }
+              ]
+            },
+            {
+              "id": "compliance_constraints",
+              "heading": "Compliance & PDPA Constraints",
+              "description": { "th": "PDPA classification requirements, data residency, retention", "en": "PDPA data classification, residency, retention, and audit requirements." },
+              "refs": [],
+              "items": [
+                { "text_th": "PDPA scope — ข้อมูลส่วนบุคคลประเภทไหนที่เก็บบ้าง", "text_en": "PDPA scope — what categories of personal data are stored" },
+                { "text_th": "Data residency requirement (region/country)", "text_en": "Data residency requirement (region/country)" },
+                { "text_th": "Retention periods แยกตาม data classification", "text_en": "Mandatory retention periods per data classification" },
+                { "text_th": "Audit trail requirements (pg_audit scope — DDL, DML, READ)", "text_en": "Audit trail requirements (pg_audit scope)" },
+                { "text_th": "Data subject rights — erasure, portability, correction procedures", "text_en": "Data subject rights procedures (erasure, portability, correction)" }
+              ]
+            },
+            {
+              "id": "ha_dr_constraints",
+              "heading": "High Availability & DR Constraints",
+              "description": { "th": "RPO/RTO targets, replication topology, failover", "en": "RPO/RTO targets, replication topology, and failover requirements." },
+              "refs": [],
+              "items": [
+                { "text_th": "RPO — ปริมาณข้อมูลสูงสุดที่ยอมสูญเสียได้ (นาที)", "text_en": "RPO — maximum acceptable data loss (minutes)" },
+                { "text_th": "RTO — downtime สูงสุดที่ยอมรับได้ (นาที)", "text_en": "RTO — maximum acceptable downtime (minutes)" },
+                { "text_th": "Replication type (streaming replication, logical replication)", "text_en": "Replication type (streaming or logical)" },
+                { "text_th": "จำนวน replicas และ cross-region DR requirements", "text_en": "Number of replicas and cross-region DR requirements" }
+              ]
+            },
+            {
+              "id": "budget_timeline",
+              "heading": "Budget & Timeline",
+              "description": { "th": "ข้อจำกัดด้านงบประมาณและเวลา", "en": "Budget ceiling, DBA availability, and project timeline." },
+              "refs": [],
+              "items": [
+                { "text_th": "Monthly hosting budget ceiling", "text_en": "Monthly hosting budget ceiling" },
+                { "text_th": "DBA team size และ availability", "text_en": "DBA team size and availability" },
+                { "text_th": "Project deadline และ phased rollout requirements", "text_en": "Project deadline and phased rollout requirements" }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "access_patterns",
+          "filename": "ACCESS_PATTERNS.md",
+          "title": "Access Patterns",
+          "description": {
+            "th": "Catalog ของ query patterns, hot paths, read/write ratios — input หลักสำหรับ indexing และ partitioning decisions",
+            "en": "Catalog of query patterns, hot paths, and read/write ratios — the primary input for indexing and partitioning decisions."
+          },
+          "priority": "P0",
+          "depends_on": ["stakeholders"],
+          "output_format": {
+            "type": "markdown",
+            "suggested_headings": ["Query Patterns", "Hot Paths", "Read/Write Ratios", "Write Patterns"]
+          },
+          "agent_hints": {
+            "instruction": "Generate an ACCESS_PATTERNS.md cataloging every significant query pattern against the database. For each pattern provide: query name, SQL sketch or pseudocode, frequency (QPS or daily count), p99 latency SLA, and columns used in WHERE/JOIN/ORDER BY. Identify the top 5-10 hot paths — the most frequent or most latency-sensitive queries that drive index and partition design. Document per-table read/write ratios and write patterns (bulk inserts, upserts, batch deletes). This document is the primary input for INDEXING_STRATEGY.md and PARTITIONING.md.",
+            "input_context": "Derive query patterns from STAKEHOLDERS.md application consumers — each application's critical queries must appear here. Every query pattern listed will be used in INDEXING_STRATEGY.md to justify index selection.",
+            "estimated_length": "600-1000 words",
+            "validation": "Every hot path must have a latency SLA. Read/write ratio must be provided for every major table. Write patterns must specify isolation level requirements (READ COMMITTED, REPEATABLE READ, SERIALIZABLE). At least 5 query patterns must be documented."
+          },
+          "sections": [
+            {
+              "id": "query_patterns",
+              "heading": "Query Patterns",
+              "description": { "th": "ทุก query pattern ที่มีนัยสำคัญต่อ schema design", "en": "All query patterns significant to schema design decisions." },
+              "refs": ["stakeholders"],
+              "items": [
+                { "text_th": "ชื่อ query และคำอธิบาย", "text_en": "Query name and description" },
+                { "text_th": "SQL sketch หรือ pseudocode", "text_en": "SQL sketch or pseudocode" },
+                { "text_th": "ความถี่ (QPS หรือ daily count)", "text_en": "Frequency (QPS or daily count)" },
+                { "text_th": "p99 latency SLA (milliseconds)", "text_en": "p99 latency SLA in milliseconds" },
+                { "text_th": "Columns ที่ใช้ใน WHERE, JOIN, ORDER BY, GROUP BY", "text_en": "Columns used in WHERE, JOIN, ORDER BY, GROUP BY" }
+              ]
+            },
+            {
+              "id": "hot_paths",
+              "heading": "Hot Paths",
+              "description": { "th": "Top 5-10 queries ที่ถี่ที่สุดหรือ latency-sensitive ที่สุด", "en": "Top 5-10 most frequent or most latency-sensitive queries." },
+              "refs": ["stakeholders"],
+              "items": [
+                { "text_th": "Query ID (อ้างอิงจาก query_patterns)", "text_en": "Query ID (referencing query_patterns)" },
+                { "text_th": "เหตุผลที่เป็น hot path (frequency, business criticality, latency)", "text_en": "Reason it is a hot path (frequency, business criticality, latency)" },
+                { "text_th": "Table scan vs index scan expectation", "text_en": "Expected table scan vs index scan behavior" },
+                { "text_th": "Projected growth rate", "text_en": "Projected growth rate" }
+              ]
+            },
+            {
+              "id": "read_write_ratios",
+              "heading": "Read/Write Ratios",
+              "description": { "th": "Read vs write breakdown แยกตาม table/schema", "en": "Per-table or per-schema read vs write breakdown." },
+              "refs": ["stakeholders"],
+              "items": [
+                { "text_th": "Table/schema name", "text_en": "Table/schema name" },
+                { "text_th": "Reads per second (estimated)", "text_en": "Estimated reads per second" },
+                { "text_th": "Writes per second (estimated)", "text_en": "Estimated writes per second" },
+                { "text_th": "Batch insert patterns (COPY, bulk INSERT, upsert)", "text_en": "Batch insert patterns (COPY, bulk INSERT, upsert)" }
+              ]
+            },
+            {
+              "id": "write_patterns",
+              "heading": "Write Patterns",
+              "description": { "th": "รายละเอียด write operations — insert, update, delete, transaction size", "en": "Detailed write operations — insert, update, delete, transaction sizes." },
+              "refs": ["stakeholders"],
+              "items": [
+                { "text_th": "Write type (single-row INSERT, bulk COPY, UPDATE, UPSERT ON CONFLICT, DELETE)", "text_en": "Write type (single-row INSERT, bulk COPY, UPDATE, UPSERT, DELETE)" },
+                { "text_th": "Average transaction size (rows)", "text_en": "Average transaction size in rows" },
+                { "text_th": "Isolation level requirements (READ COMMITTED, REPEATABLE READ, SERIALIZABLE)", "text_en": "Transaction isolation level requirements" },
+                { "text_th": "Write contention hotspots ที่คาดการณ์", "text_en": "Expected write contention hotspots" }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "phase_logical",
+      "order": 2,
+      "title": { "th": "Logical Design", "en": "Logical Design" },
+      "description": {
+        "th": "เป้าหมาย: แปลง business requirements เป็น relational model ที่ถูกต้อง — entities, relationships, field definitions, และ normalization decisions",
+        "en": "Goal: Translate business requirements into a correct relational model — entities, relationships, field definitions, and normalization decisions."
+      },
+      "documents": [
+        {
+          "id": "domain_model",
+          "filename": "DOMAIN_MODEL.md",
+          "title": "Domain Model",
+          "description": {
+            "th": "Map business concepts ไปยัง PostgreSQL schemas — bounded contexts, entities, aggregates, business rules, และ domain events",
+            "en": "Maps business concepts to PostgreSQL schemas — bounded contexts, entities, aggregates, business rules, and domain events."
+          },
+          "priority": "P0",
+          "depends_on": ["stakeholders", "constraints"],
+          "output_format": {
+            "type": "markdown",
+            "suggested_headings": ["Bounded Contexts", "Entities & Aggregates", "Business Rules as Constraints", "Domain Events & Audit Trail"]
+          },
+          "agent_hints": {
+            "instruction": "Generate a DOMAIN_MODEL.md mapping business concepts to relational structures. Identify bounded contexts (each maps to a PostgreSQL schema), entities and aggregate roots, business rules that must be enforced as database constraints (CHECK, EXCLUDE, triggers), and domain events requiring audit trails. Every concept must map to a concrete PostgreSQL artifact: schema, table, constraint type, or trigger.",
+            "input_context": "Derive entities from STAKEHOLDERS.md data ownership matrix and domain knowledge. CONSTRAINTS.md compliance section informs which data requires audit trails. Business rules become CHECK constraints or triggers in SCHEMA_SPEC.md.",
+            "estimated_length": "500-900 words",
+            "validation": "Every bounded context must map to a PG schema name. Every entity must declare aggregate root status (yes/no). Business rules must specify the enforcement mechanism (CHECK, EXCLUDE, trigger, application-layer)."
+          },
+          "sections": [
+            {
+              "id": "bounded_contexts",
+              "heading": "Bounded Contexts",
+              "description": { "th": "DDD bounded contexts แต่ละอันจะ map ไปยัง PostgreSQL schema หนึ่งอัน", "en": "Each bounded context maps to one PostgreSQL schema." },
+              "refs": ["stakeholders"],
+              "items": [
+                { "text_th": "ชื่อ context และ schema name ที่สอดคล้อง", "text_en": "Context name and corresponding schema name" },
+                { "text_th": "Owning team หรือ domain owner", "text_en": "Owning team or domain owner" },
+                { "text_th": "Key invariants/business rules ที่ context นี้ enforce", "text_en": "Key invariants and business rules enforced within this context" }
+              ]
+            },
+            {
+              "id": "entities_aggregates",
+              "heading": "Entities & Aggregates",
+              "description": { "th": "Core entities, aggregate roots, value objects และ lifecycle states", "en": "Core entities, aggregate roots, value objects, and lifecycle states." },
+              "refs": ["stakeholders", "constraints"],
+              "items": [
+                { "text_th": "Entity name และ aggregate root status", "text_en": "Entity name and aggregate root status" },
+                { "text_th": "Natural key vs surrogate key decision (UUID, serial, identity)", "text_en": "Natural key vs surrogate key decision" },
+                { "text_th": "Lifecycle states (created, active, archived, deleted)", "text_en": "Lifecycle states" },
+                { "text_th": "Key business rules สำหรับ entity นี้", "text_en": "Key business rules for this entity" }
+              ]
+            },
+            {
+              "id": "business_rules",
+              "heading": "Business Rules as Constraints",
+              "description": { "th": "Business invariants ที่ต้อง enforce ที่ database level", "en": "Business invariants that must be enforced at the database level." },
+              "refs": ["constraints"],
+              "items": [
+                { "text_th": "Rule description ในภาษาธรรมดา", "text_en": "Rule description in plain language" },
+                { "text_th": "Enforcement mechanism (CHECK constraint, EXCLUDE constraint, trigger, application-layer)", "text_en": "Enforcement mechanism" },
+                { "text_th": "Example violation scenario", "text_en": "Example violation scenario" }
+              ]
+            },
+            {
+              "id": "domain_events",
+              "heading": "Domain Events & Audit Trail",
+              "description": { "th": "Events ที่ต้อง capture เพื่อ audit หรือ event sourcing", "en": "Events that must be captured for audit or event sourcing." },
+              "refs": ["constraints"],
+              "items": [
+                { "text_th": "Event name และ triggering entity", "text_en": "Event name and triggering entity" },
+                { "text_th": "Payload fields ที่ต้อง record", "text_en": "Payload fields to record" },
+                { "text_th": "Retention requirement (อ้างอิง PDPA จาก constraints)", "text_en": "Retention requirement" },
+                { "text_th": "Downstream consumers ของ event", "text_en": "Downstream consumers of the event" }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "glossary",
+          "filename": "GLOSSARY.md",
+          "title": "Business Glossary",
+          "description": {
+            "th": "Ubiquitous language ของโปรเจกต์ — นิยาม business terms ให้ตรงกันทุกฝ่าย แยกจาก field-level definitions ใน DATA_DICTIONARY.md",
+            "en": "The project's ubiquitous language — business term definitions agreed by all parties, distinct from the field-level definitions in DATA_DICTIONARY.md."
+          },
+          "priority": "P1",
+          "depends_on": ["stakeholders", "domain_model"],
+          "output_format": {
+            "type": "markdown",
+            "suggested_headings": ["Term Definitions", "Term-to-Entity Mapping", "Disputed Terms", "Glossary Change Log"]
+          },
+          "agent_hints": {
+            "instruction": "Generate a GLOSSARY.md defining the project's ubiquitous language. Collect every business term used by stakeholders and in the domain model — especially terms where the same word means different things to different roles (e.g., 'visit' to a doctor vs 'appointment' to a receptionist). For each term give a single agreed definition, the owning bounded context, and synonyms that must NOT be used in schema naming. Map every term to the entity or table that implements it. Record disputed terms with the competing definitions and the resolution. This glossary is the naming authority: DATA_DICTIONARY.md and SCHEMA_SPEC.md identifiers must derive from these terms.",
+            "input_context": "Terms originate from STAKEHOLDERS.md profiles and DOMAIN_MODEL.md bounded contexts and entities. Every entity in DOMAIN_MODEL.md must appear as (or map to) a glossary term.",
+            "estimated_length": "300-600 words",
+            "validation": "Every term must have exactly one definition and one owning bounded context. Every DOMAIN_MODEL.md entity must map to a term. Disputed terms must record the resolution, not just the dispute. No orphan terms that map to nothing."
+          },
+          "sections": [
+            {
+              "id": "term_definitions",
+              "heading": "Term Definitions",
+              "description": { "th": "นิยามเดียวที่ทุกฝ่ายยอมรับ ต่อหนึ่ง business term", "en": "One agreed definition per business term." },
+              "refs": ["stakeholders", "domain_model"],
+              "items": [
+                { "text_th": "Term (English) พร้อมนิยามภาษาไทยที่ทุก role ยอมรับ", "text_en": "Term (English) with the Thai definition agreed by every role" },
+                { "text_th": "Bounded context ที่เป็นเจ้าของ term", "text_en": "Owning bounded context" },
+                { "text_th": "Synonyms ที่ห้ามใช้ใน schema naming", "text_en": "Synonyms that must not be used in schema naming" },
+                { "text_th": "Stakeholder role ที่ใช้ term นี้บ่อยที่สุด", "text_en": "Stakeholder role that uses this term most" }
+              ]
+            },
+            {
+              "id": "term_to_entity_mapping",
+              "heading": "Term-to-Entity Mapping",
+              "description": { "th": "ตาราง map จาก business term ไปยัง entity/table ที่ implement", "en": "Mapping table from business term to the implementing entity/table." },
+              "refs": ["domain_model"],
+              "items": [
+                { "text_th": "Term → entity ใน DOMAIN_MODEL.md → ชื่อ table ที่คาดหวัง", "text_en": "Term → DOMAIN_MODEL.md entity → expected table name" },
+                { "text_th": "Terms ที่ไม่มี entity รองรับ (ต้องตัดสินใจ: เพิ่ม entity หรือตัด term)", "text_en": "Terms with no backing entity (decide: add entity or drop term)" },
+                { "text_th": "Entities ที่ไม่มี term รองรับ (naming ต้องกลับมาแก้)", "text_en": "Entities with no backing term (naming must be revisited)" }
+              ]
+            },
+            {
+              "id": "disputed_terms",
+              "heading": "Disputed Terms",
+              "description": { "th": "Terms ที่แต่ละฝ่ายเข้าใจไม่ตรงกัน พร้อมข้อยุติ", "en": "Terms understood differently by different parties, with the resolution." },
+              "refs": ["stakeholders"],
+              "items": [
+                { "text_th": "Term และนิยามที่ขัดแย้งกันของแต่ละ role", "text_en": "Term and each role's competing definition" },
+                { "text_th": "ข้อยุติ (นิยามที่เลือก) และเหตุผล", "text_en": "Resolution (chosen definition) and rationale" },
+                { "text_th": "ผลกระทบต่อ naming ใน schema", "text_en": "Impact on schema naming" }
+              ]
+            },
+            {
+              "id": "glossary_change_log",
+              "heading": "Glossary Change Log",
+              "description": { "th": "ประวัติการเพิ่ม/แก้นิยาม term", "en": "History of term additions and definition changes." },
+              "refs": ["data_dictionary", "schema_spec"],
+              "items": [
+                { "text_th": "วันที่, term, การเปลี่ยนแปลง, ผู้อนุมัติ", "text_en": "Date, term, change, approver" },
+                { "text_th": "Downstream documents ที่ต้องแก้ตาม (DATA_DICTIONARY.md, SCHEMA_SPEC.md)", "text_en": "Downstream documents to update (DATA_DICTIONARY.md, SCHEMA_SPEC.md)" }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "erd",
+          "filename": "ERD.md",
+          "title": "Entity-Relationship Diagram",
+          "description": {
+            "th": "Mermaid ERD ครบทุก entity พร้อม cardinalities, ON DELETE behavior, junction tables, และ inheritance patterns",
+            "en": "Complete Mermaid ERD with all entities, cardinalities, ON DELETE behavior, junction tables, and inheritance patterns."
+          },
+          "priority": "P0",
+          "depends_on": ["domain_model", "access_patterns"],
+          "output_format": {
+            "type": "markdown",
+            "suggested_headings": ["Entity-Relationship Diagram", "Cardinalities & Relationship Types", "Junction Tables", "Inheritance & Polymorphism"]
+          },
+          "agent_hints": {
+            "instruction": "Generate an ERD.md with a complete Mermaid erDiagram covering all entities from DOMAIN_MODEL.md. Document every relationship with cardinality (1:1, 1:N, N:M), optionality (optional vs mandatory), and ON DELETE behavior (CASCADE, SET NULL, RESTRICT, NO ACTION). Create junction tables for every M:N relationship. If inheritance exists, document the chosen PostgreSQL pattern: single-table with discriminator column, table-per-type with FK to parent, or partitioned inheritance — include trade-off rationale. Consider ACCESS_PATTERNS.md when deciding whether to embed vs join (denormalize).",
+            "input_context": "Entities come from DOMAIN_MODEL.md bounded contexts and aggregates. ACCESS_PATTERNS.md hot paths may justify denormalizing certain relationships to avoid expensive JOINs.",
+            "estimated_length": "500-800 words",
+            "validation": "Every entity in DOMAIN_MODEL.md must appear in the ERD diagram. Every M:N relationship must have a junction table. ON DELETE behavior must be specified for every FK. Mermaid erDiagram syntax must be valid."
+          },
+          "sections": [
+            {
+              "id": "er_diagram",
+              "heading": "Entity-Relationship Diagram",
+              "description": { "th": "Mermaid erDiagram ครบทุก entity และ relationship", "en": "Complete Mermaid erDiagram covering all entities and relationships." },
+              "refs": ["domain_model"],
+              "items": [
+                { "text_th": "Mermaid erDiagram block ครบทุก entity", "text_en": "Complete Mermaid erDiagram block" },
+                { "text_th": "Entities จัดกลุ่มตาม bounded context/schema", "text_en": "Entities grouped by bounded context/schema" },
+                { "text_th": "Relationship lines พร้อม cardinality labels", "text_en": "Relationship lines with cardinality labels" }
+              ]
+            },
+            {
+              "id": "cardinalities",
+              "heading": "Cardinalities & Relationship Types",
+              "description": { "th": "ตาราง cardinality ครบทุก relationship", "en": "Detailed cardinality table for every relationship." },
+              "refs": ["domain_model", "access_patterns"],
+              "items": [
+                { "text_th": "Parent entity และ child entity", "text_en": "Parent and child entity" },
+                { "text_th": "Cardinality (1:1, 1:N, N:M)", "text_en": "Cardinality (1:1, 1:N, N:M)" },
+                { "text_th": "Nullable (optional) vs mandatory relationship", "text_en": "Nullable vs mandatory relationship" },
+                { "text_th": "ON DELETE behavior (CASCADE, SET NULL, RESTRICT, NO ACTION)", "text_en": "ON DELETE behavior" }
+              ]
+            },
+            {
+              "id": "junction_tables",
+              "heading": "Junction Tables",
+              "description": { "th": "Tables สำหรับ M:N relationships", "en": "Tables required for many-to-many relationships." },
+              "refs": ["domain_model"],
+              "items": [
+                { "text_th": "Junction table name", "text_en": "Junction table name" },
+                { "text_th": "Left FK และ Right FK", "text_en": "Left FK and Right FK" },
+                { "text_th": "Additional payload columns (ถ้ามี)", "text_en": "Additional payload columns (if any)" },
+                { "text_th": "UNIQUE constraint บน FK pair", "text_en": "UNIQUE constraint on the FK pair" }
+              ]
+            },
+            {
+              "id": "inheritance_patterns",
+              "heading": "Inheritance & Polymorphism",
+              "description": { "th": "วิธี model entity hierarchies ใน PostgreSQL", "en": "How to model entity hierarchies in PostgreSQL." },
+              "refs": ["domain_model"],
+              "items": [
+                { "text_th": "Parent entity และ child entity variants", "text_en": "Parent entity and child entity variants" },
+                { "text_th": "Pattern ที่เลือก (single-table, table-per-type, partitioned)", "text_en": "Chosen pattern (single-table, table-per-type, or partitioned inheritance)" },
+                { "text_th": "Discriminator column (กรณี single-table)", "text_en": "Discriminator column (for single-table inheritance)" },
+                { "text_th": "Trade-offs ของ pattern ที่เลือก", "text_en": "Trade-offs of the chosen pattern" }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "data_dictionary",
+          "filename": "DATA_DICTIONARY.md",
+          "title": "Data Dictionary",
+          "description": {
+            "th": "Canonical definition ของทุก field ใน database — PG data types, custom domains, enumerations, และ naming conventions",
+            "en": "Canonical definition of every field in the database — PG data types, custom domains, enumerations, and naming conventions."
+          },
+          "priority": "P0",
+          "depends_on": ["erd", "glossary"],
+          "output_format": {
+            "type": "markdown",
+            "suggested_headings": ["Field Definitions", "Custom Types & Domains", "Enumerations", "Naming Conventions", "Object Comments & Metadata"]
+          },
+          "agent_hints": {
+            "instruction": "Generate a DATA_DICTIONARY.md providing canonical definitions for every field. Use PostgreSQL-native types: prefer timestamptz over timestamp, text over varchar unless a length limit is meaningful, uuid over serial for PKs (use gen_random_uuid()), jsonb over json, numeric over float for money/precise decimals, inet/cidr for IP addresses, tstzrange for time ranges. Define CREATE DOMAIN types for recurring patterns (email, phone_th, currency_amount). Document every PG enum type with its values and extensibility strategy (ALTER TYPE ADD VALUE vs lookup table). Establish naming conventions enforced throughout SCHEMA_SPEC.md.",
+            "input_context": "All fields derive from ERD.md entities and relationships. Custom types feed directly into SCHEMA_SPEC.md DDL. Naming conventions must be consistent with DOMAIN_MODEL.md bounded context and schema naming.",
+            "estimated_length": "600-1000 words",
+            "validation": "Every entity in ERD.md must have all its fields listed. Every field must have a PostgreSQL data type. No mixed naming styles allowed. Custom domains must have CHECK constraints."
+          },
+          "sections": [
+            {
+              "id": "field_definitions",
+              "heading": "Field Definitions",
+              "description": { "th": "Canonical definition ของทุก field แยกตาม table", "en": "Canonical definition of every field, organized by table." },
+              "refs": ["erd", "glossary"],
+              "items": [
+                { "text_th": "schema.table.column พร้อม PG data type", "text_en": "schema.table.column with PostgreSQL data type" },
+                { "text_th": "Nullable (YES/NO) และ DEFAULT value", "text_en": "Nullable (YES/NO) and DEFAULT value" },
+                { "text_th": "Description ของ field ในภาษาธรรมดา", "text_en": "Plain-language description of the field" },
+                { "text_th": "PDPA sensitivity level (Personal, Sensitive, Non-personal)", "text_en": "PDPA sensitivity level" }
+              ]
+            },
+            {
+              "id": "custom_types",
+              "heading": "Custom Types & Domains",
+              "description": { "th": "CREATE TYPE และ CREATE DOMAIN definitions", "en": "CREATE TYPE and CREATE DOMAIN definitions." },
+              "refs": ["erd"],
+              "items": [
+                { "text_th": "Type/domain name และ base PG type", "text_en": "Type/domain name and base PostgreSQL type" },
+                { "text_th": "CHECK constraint ของ domain", "text_en": "Domain CHECK constraint" },
+                { "text_th": "Rationale สำหรับการสร้าง custom type", "text_en": "Rationale for creating a custom type" },
+                { "text_th": "Tables ที่ใช้ type นี้", "text_en": "Tables that use this type" }
+              ]
+            },
+            {
+              "id": "enumerations",
+              "heading": "Enumerations",
+              "description": { "th": "PostgreSQL enum types หรือ lookup tables", "en": "PostgreSQL enum types or lookup tables." },
+              "refs": ["domain_model"],
+              "items": [
+                { "text_th": "Enum name และ values list", "text_en": "Enum name and values list" },
+                { "text_th": "Extensibility approach (ALTER TYPE ADD VALUE vs lookup table)", "text_en": "Extensibility approach (ALTER TYPE ADD VALUE vs lookup table)" },
+                { "text_th": "Migration impact ของการเพิ่ม value ใหม่", "text_en": "Migration impact of adding new values" }
+              ]
+            },
+            {
+              "id": "naming_conventions",
+              "heading": "Naming Conventions",
+              "description": { "th": "Naming rules ที่ enforce ตลอดทั้ง schema", "en": "Naming rules enforced throughout the schema." },
+              "refs": [],
+              "items": [
+                { "text_th": "Tables: plural snake_case (เช่น patients, appointment_slots)", "text_en": "Tables: plural snake_case (e.g., patients, appointment_slots)" },
+                { "text_th": "Columns: singular snake_case; PKs = id หรือ <entity>_id", "text_en": "Columns: singular snake_case; PKs = id or <entity>_id" },
+                { "text_th": "Indexes: idx_<table>_<columns> (เช่น idx_patients_email)", "text_en": "Indexes: idx_<table>_<columns> (e.g., idx_patients_email)" },
+                { "text_th": "Constraints: chk_/uq_/fk_/exc_ prefix ตามประเภท", "text_en": "Constraints: chk_/uq_/fk_/exc_ prefix by type" }
+              ]
+            },
+            {
+              "id": "object_comments_metadata",
+              "heading": "Object Comments & Metadata",
+              "description": { "th": "นโยบาย COMMENT ON และ metadata annotations ใน catalog", "en": "COMMENT ON policy and catalog metadata annotations." },
+              "refs": [],
+              "items": [
+                { "text_th": "COMMENT ON coverage policy: ทุก schema, table, และ column ที่ไม่ self-explanatory ต้องมี comment", "text_en": "COMMENT ON coverage policy: every schema, table, and non-self-explanatory column must have a comment" },
+                { "text_th": "Ownership annotation ใน comment (team/bounded context เจ้าของ object)", "text_en": "Ownership annotation in comments (owning team/bounded context)" },
+                { "text_th": "PDPA sensitivity tag ใน column comment ให้ตรงกับ classification", "text_en": "PDPA sensitivity tag in column comments matching the classification" },
+                { "text_th": "Query ตรวจ coverage จาก pg_description (หา objects ที่ยังไม่มี comment)", "text_en": "Coverage check query against pg_description (find uncommented objects)" }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "normalization",
+          "filename": "NORMALIZATION.md",
+          "title": "Normalization & Denormalization",
+          "description": {
+            "th": "วิเคราะห์ normal form ของทุก table, อธิบาย denormalization decisions ที่ตั้งใจทำ, และ materialized views strategy",
+            "en": "Analyzes normal form of every table, documents intentional denormalization decisions with justification, and defines materialized view strategy."
+          },
+          "priority": "P1",
+          "depends_on": ["erd", "access_patterns"],
+          "output_format": {
+            "type": "markdown",
+            "suggested_headings": ["Normal Form Analysis", "Denormalization Decisions", "Materialized Views"]
+          },
+          "agent_hints": {
+            "instruction": "Generate a NORMALIZATION.md analyzing the normal form of every table from ERD.md. Target 3NF/BCNF as the baseline. For each intentional denormalization, cite the specific hot path from ACCESS_PATTERNS.md that justifies it and specify the consistency mechanism (trigger, materialized view, or application-layer sync). Document all materialized views with REFRESH MATERIALIZED VIEW CONCURRENTLY strategy and staleness tolerance.",
+            "input_context": "ERD.md provides the table structure to analyze. ACCESS_PATTERNS.md hot paths justify denormalization — every deviation from 3NF must reference a specific query pattern ID. Materialized views must reference which hot paths they serve.",
+            "estimated_length": "400-700 words",
+            "validation": "Every table must have a normal form assessment. Every denormalization must cite the ACCESS_PATTERNS.md query pattern ID that justifies it. Materialized views must specify refresh strategy and staleness tolerance in minutes."
+          },
+          "sections": [
+            {
+              "id": "normal_form_analysis",
+              "heading": "Normal Form Analysis",
+              "description": { "th": "Normal form ของแต่ละ table และ functional dependencies", "en": "Normal form of each table and its functional dependencies." },
+              "refs": ["erd"],
+              "items": [
+                { "text_th": "Table name และ current normal form (1NF/2NF/3NF/BCNF)", "text_en": "Table name and current normal form (1NF/2NF/3NF/BCNF)" },
+                { "text_th": "Functional dependencies ที่ระบุได้", "text_en": "Identified functional dependencies" },
+                { "text_th": "Transitive dependencies ที่อาจมี", "text_en": "Potential transitive dependencies" }
+              ]
+            },
+            {
+              "id": "denormalization_decisions",
+              "heading": "Denormalization Decisions",
+              "description": { "th": "Denormalizations ที่ตั้งใจทำ พร้อม justification", "en": "Intentional denormalizations with explicit justification." },
+              "refs": ["erd", "access_patterns"],
+              "items": [
+                { "text_th": "Table name และ denormalized field(s)", "text_en": "Table name and denormalized fields" },
+                { "text_th": "Normal form violation (2NF, 3NF, BCNF)", "text_en": "Normal form violation level" },
+                { "text_th": "Business justification (อ้าง hot path ID จาก access_patterns)", "text_en": "Business justification citing hot path ID from access_patterns" },
+                { "text_th": "Consistency strategy (trigger, materialized view, application-layer sync)", "text_en": "Consistency strategy (trigger, materialized view, or application-layer sync)" }
+              ]
+            },
+            {
+              "id": "materialized_views",
+              "heading": "Materialized Views",
+              "description": { "th": "Pre-computed aggregates หรือ denormalized views ด้วย REFRESH MATERIALIZED VIEW CONCURRENTLY", "en": "Pre-computed aggregates using REFRESH MATERIALIZED VIEW CONCURRENTLY." },
+              "refs": ["erd", "access_patterns"],
+              "items": [
+                { "text_th": "View name และ source tables", "text_en": "View name and source tables" },
+                { "text_th": "Refresh strategy (REFRESH MATERIALIZED VIEW CONCURRENTLY) และ schedule", "text_en": "Refresh strategy and schedule" },
+                { "text_th": "Staleness tolerance (นาที)", "text_en": "Staleness tolerance in minutes" },
+                { "text_th": "Indexes on the materialized view", "text_en": "Indexes on the materialized view" }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "phase_physical",
+      "order": 3,
+      "title": { "th": "Physical Design (PostgreSQL)", "en": "Physical Design (PostgreSQL)" },
+      "description": {
+        "th": "เป้าหมาย: แปลง logical model เป็น PostgreSQL DDL จริง — tables, indexes, partitions, RLS, extensions — ทุกอย่างเป็น PG-specific",
+        "en": "Goal: Translate the logical model into actual PostgreSQL DDL — tables, indexes, partitions, RLS, extensions — all PostgreSQL-specific."
+      },
+      "documents": [
+        {
+          "id": "schema_spec",
+          "filename": "SCHEMA_SPEC.md",
+          "title": "Schema Specification",
+          "description": {
+            "th": "Single source of truth สำหรับ physical database structure — extensions, schemas, DDL, custom types, triggers, functions",
+            "en": "Single source of truth for the physical database structure — extensions, schemas, DDL, custom types, triggers, and functions."
+          },
+          "priority": "P0",
+          "depends_on": ["data_dictionary", "normalization", "constraints"],
+          "output_format": {
+            "type": "markdown",
+            "suggested_headings": ["Extensions & Configuration", "Schema Organization", "Table DDL", "Custom Types DDL", "Triggers & Functions"]
+          },
+          "agent_hints": {
+            "instruction": "Generate a SCHEMA_SPEC.md with production-ready PostgreSQL DDL. Start with CREATE EXTENSION statements (install order matters — pgcrypto before pg_audit). Organize tables into schemas matching DOMAIN_MODEL.md bounded contexts. Write complete CREATE TABLE DDL including all columns (from DATA_DICTIONARY.md types), PRIMARY KEY, UNIQUE, CHECK, EXCLUDE USING gist (for range constraints), FOREIGN KEY with ON DELETE/ON UPDATE, and DEFAULT values. Use GENERATED ALWAYS AS (expression) STORED for computed columns. Use gen_random_uuid() for UUID PKs. Document PL/pgSQL triggers for computed fields, audit logging, and validations too complex for CHECK constraints.",
+            "input_context": "Column types and constraints come from DATA_DICTIONARY.md. Table relationships and FKs come from ERD.md (via normalization). PG version and extension constraints come from CONSTRAINTS.md. Normalization decisions about denormalization come from NORMALIZATION.md.",
+            "estimated_length": "800-1500 words",
+            "validation": "Every entity in ERD.md must have complete DDL. Every column must match DATA_DICTIONARY.md type. Every FK must reflect ERD.md cardinality. Extension versions must be compatible with CONSTRAINTS.md PG version. All DDL must be idempotent (use CREATE TABLE IF NOT EXISTS, CREATE INDEX IF NOT EXISTS)."
+          },
+          "sections": [
+            {
+              "id": "extensions_setup",
+              "heading": "Extensions & Configuration",
+              "description": { "th": "CREATE EXTENSION statements และ GUC settings ที่ต้องการ", "en": "CREATE EXTENSION statements and required GUC settings." },
+              "refs": ["constraints"],
+              "items": [
+                { "text_th": "Extension name, version, และ purpose", "text_en": "Extension name, version, and purpose" },
+                { "text_th": "Installation order (dependencies ระหว่าง extensions)", "text_en": "Installation order (inter-extension dependencies)" },
+                { "text_th": "Required GUC changes (shared_preload_libraries สำหรับ pg_audit, pg_stat_statements)", "text_en": "Required GUC changes (shared_preload_libraries for pg_audit, pg_stat_statements)" }
+              ]
+            },
+            {
+              "id": "schema_organization",
+              "heading": "Schema Organization",
+              "description": { "th": "CREATE SCHEMA, search_path, schema-level privileges", "en": "CREATE SCHEMA statements, search_path, and schema-level privileges." },
+              "refs": ["domain_model", "stakeholders"],
+              "items": [
+                { "text_th": "Schema name และ purpose (maps to bounded context)", "text_en": "Schema name and purpose (maps to bounded context)" },
+                { "text_th": "Default privileges per schema (GRANT USAGE, GRANT CREATE)", "text_en": "Default privileges per schema" },
+                { "text_th": "search_path configuration", "text_en": "search_path configuration" }
+              ]
+            },
+            {
+              "id": "ddl_tables",
+              "heading": "Table DDL",
+              "description": { "th": "Complete CREATE TABLE statements ทุก table", "en": "Complete CREATE TABLE statements for every table." },
+              "refs": ["data_dictionary", "erd", "normalization"],
+              "items": [
+                { "text_th": "Full DDL with columns, types, PRIMARY KEY", "text_en": "Full DDL with columns, types, and PRIMARY KEY" },
+                { "text_th": "UNIQUE, CHECK, EXCLUDE constraints", "text_en": "UNIQUE, CHECK, and EXCLUDE constraints" },
+                { "text_th": "FOREIGN KEY with ON DELETE/ON UPDATE behavior", "text_en": "FOREIGN KEY with ON DELETE/ON UPDATE behavior" },
+                { "text_th": "DEFAULT values และ GENERATED ALWAYS columns", "text_en": "DEFAULT values and GENERATED ALWAYS columns" }
+              ]
+            },
+            {
+              "id": "custom_types_ddl",
+              "heading": "Custom Types DDL",
+              "description": { "th": "CREATE TYPE และ CREATE DOMAIN statements จาก data_dictionary", "en": "CREATE TYPE and CREATE DOMAIN statements from data_dictionary." },
+              "refs": ["data_dictionary"],
+              "items": [
+                { "text_th": "DDL statement (CREATE DOMAIN / CREATE TYPE)", "text_en": "DDL statement (CREATE DOMAIN / CREATE TYPE)" },
+                { "text_th": "Validation CHECK expression", "text_en": "Validation CHECK expression" },
+                { "text_th": "Tables ที่ใช้ type นี้", "text_en": "Tables that reference this type" }
+              ]
+            },
+            {
+              "id": "triggers_functions",
+              "heading": "Triggers & Functions",
+              "description": { "th": "PL/pgSQL functions และ triggers สำหรับ business logic, audit, computed fields", "en": "PL/pgSQL functions and triggers for business logic, audit logging, and computed fields." },
+              "refs": ["domain_model", "constraints"],
+              "items": [
+                { "text_th": "Function name, signature, และ return type", "text_en": "Function name, signature, and return type" },
+                { "text_th": "Trigger event (BEFORE/AFTER INSERT/UPDATE/DELETE) และ table", "text_en": "Trigger event (BEFORE/AFTER INSERT/UPDATE/DELETE) and table" },
+                { "text_th": "Purpose (audit logging, computed field, complex validation)", "text_en": "Purpose (audit logging, computed field, or complex validation)" },
+                { "text_th": "Idempotency notes", "text_en": "Idempotency notes" }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "indexing_strategy",
+          "filename": "INDEXING_STRATEGY.md",
+          "title": "Indexing Strategy",
+          "description": {
+            "th": "Index ทุกตัวพร้อม type, columns, และ hot path ที่ justify — B-tree, GIN, GiST, BRIN, partial, covering indexes",
+            "en": "Every index with type, columns, and justifying hot path — B-tree, GIN, GiST, BRIN, partial, and covering indexes."
+          },
+          "priority": "P0",
+          "depends_on": ["schema_spec", "access_patterns"],
+          "output_format": {
+            "type": "markdown",
+            "suggested_headings": ["Index Inventory", "Index Type Decisions", "Composite & Covering Indexes", "Index Maintenance"]
+          },
+          "agent_hints": {
+            "instruction": "Generate an INDEXING_STRATEGY.md mapping every hot path from ACCESS_PATTERNS.md to a concrete index. Use PG-specific types: B-tree (default, range scans, ORDER BY, equality), GIN (jsonb operators, arrays, full-text search with tsvector, pg_trgm trigram similarity), GiST (PostGIS geometry, range types, exclusion constraints), BRIN (append-only time-series with natural ordering — very small overhead), Hash (equality-only, rarely better than B-tree). Design composite indexes with equality columns first, range columns second. Use INCLUDE clause for covering indexes to enable index-only scans. Use WHERE clause for partial indexes to reduce size. Every production index must use CREATE INDEX CONCURRENTLY.",
+            "input_context": "Hot paths and query column usage come from ACCESS_PATTERNS.md. Table and column structures come from SCHEMA_SPEC.md. Available extensions (pg_trgm, postgis) come from CONSTRAINTS.md.",
+            "estimated_length": "600-1000 words",
+            "validation": "Every hot path in ACCESS_PATTERNS.md must have at least one corresponding index. GIN must be used for jsonb/array/tsvector columns. BRIN must be justified with append-only + natural ordering. Every index must cite the access pattern ID it serves."
+          },
+          "sections": [
+            {
+              "id": "index_inventory",
+              "heading": "Index Inventory",
+              "description": { "th": "ทุก index พร้อม type, columns, และ justifying query pattern", "en": "Every index with type, columns, and justifying query pattern." },
+              "refs": ["schema_spec", "access_patterns"],
+              "items": [
+                { "text_th": "Index name (ตาม naming convention จาก data_dictionary)", "text_en": "Index name (following naming convention from data_dictionary)" },
+                { "text_th": "Index type (B-tree, GIN, GiST, BRIN, Hash)", "text_en": "Index type (B-tree, GIN, GiST, BRIN, Hash)" },
+                { "text_th": "Indexed columns และ INCLUDE columns (covering index)", "text_en": "Indexed columns and INCLUDE columns (covering index)" },
+                { "text_th": "WHERE clause สำหรับ partial index (ถ้ามี)", "text_en": "WHERE clause for partial index (if applicable)" },
+                { "text_th": "Query pattern ID จาก access_patterns ที่ justify index นี้", "text_en": "Query pattern ID from access_patterns that justifies this index" }
+              ]
+            },
+            {
+              "id": "index_type_decisions",
+              "heading": "Index Type Decisions",
+              "description": { "th": "Rationale สำหรับการเลือก index type แต่ละอัน", "en": "Rationale for choosing each index type." },
+              "refs": ["access_patterns", "constraints"],
+              "items": [
+                { "text_th": "B-tree: default สำหรับ equality, range scans, ORDER BY", "text_en": "B-tree: default for equality, range scans, ORDER BY" },
+                { "text_th": "GIN: jsonb operators (@>, ?, ?&), arrays, tsvector full-text, pg_trgm LIKE/ILIKE", "text_en": "GIN: jsonb operators, arrays, tsvector full-text, pg_trgm LIKE/ILIKE" },
+                { "text_th": "GiST: PostGIS geometry, range types (tstzrange, daterange), exclusion constraints", "text_en": "GiST: PostGIS geometry, range types, exclusion constraints" },
+                { "text_th": "BRIN: append-only large tables with natural physical ordering (time-series, log tables)", "text_en": "BRIN: append-only large tables with natural physical ordering" }
+              ]
+            },
+            {
+              "id": "composite_index_design",
+              "heading": "Composite & Covering Indexes",
+              "description": { "th": "Multi-column indexes และ INCLUDE clause สำหรับ index-only scans", "en": "Multi-column indexes and INCLUDE clause for index-only scans." },
+              "refs": ["schema_spec", "access_patterns"],
+              "items": [
+                { "text_th": "Column order rationale (equality columns ก่อน, range columns หลัง)", "text_en": "Column order rationale (equality columns first, range columns last)" },
+                { "text_th": "Covering index strategy ด้วย INCLUDE clause", "text_en": "Covering index strategy using INCLUDE clause" },
+                { "text_th": "Expected EXPLAIN ANALYZE output (index scan vs index-only scan)", "text_en": "Expected EXPLAIN ANALYZE output showing index-only scan" }
+              ]
+            },
+            {
+              "id": "index_maintenance",
+              "heading": "Index Maintenance",
+              "description": { "th": "Bloat monitoring, REINDEX strategy, unused index detection", "en": "Bloat monitoring, REINDEX strategy, and unused index detection." },
+              "refs": ["schema_spec"],
+              "items": [
+                { "text_th": "Bloat detection (pg_stat_user_indexes, pgstattuple)", "text_en": "Bloat detection using pg_stat_user_indexes or pgstattuple" },
+                { "text_th": "REINDEX CONCURRENTLY schedule", "text_en": "REINDEX CONCURRENTLY schedule" },
+                { "text_th": "Unused index detection (idx_scan = 0 ใน pg_stat_user_indexes)", "text_en": "Unused index detection (idx_scan = 0 in pg_stat_user_indexes)" }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "partitioning",
+          "filename": "PARTITIONING.md",
+          "title": "Partitioning Strategy",
+          "description": {
+            "th": "PostgreSQL declarative partitioning — RANGE, LIST, HASH — พร้อม partition pruning, naming conventions, และ maintenance automation",
+            "en": "PostgreSQL declarative partitioning — RANGE, LIST, HASH — with partition pruning, naming conventions, and maintenance automation."
+          },
+          "priority": "P1",
+          "depends_on": ["schema_spec", "access_patterns", "constraints"],
+          "output_format": {
+            "type": "markdown",
+            "suggested_headings": ["Partition Candidates", "Partition Scheme", "Partition Pruning & Query Optimization", "Partition Maintenance"]
+          },
+          "agent_hints": {
+            "instruction": "Generate a PARTITIONING.md for tables that benefit from PostgreSQL declarative partitioning. Evaluate candidates based on table size projections from CONSTRAINTS.md and hot path queries from ACCESS_PATTERNS.md. Use RANGE partitioning for time-series data (partition by month/year), LIST for low-cardinality categorical data, HASH for even distribution without natural ordering. Document CREATE TABLE ... PARTITION BY DDL, child partition DDL with bounds, default partition for unmatched rows, and naming conventions (e.g., appointments_y2026_m01). Plan maintenance automation using pg_partman or cron jobs. Show EXPLAIN output examples demonstrating partition pruning.",
+            "input_context": "Table sizes from CONSTRAINTS.md determine which tables justify partitioning. ACCESS_PATTERNS.md hot paths show which queries benefit from pruning. SCHEMA_SPEC.md provides base table structure.",
+            "estimated_length": "500-800 words",
+            "validation": "Every partitioned table must justify partitioning with projected row count from CONSTRAINTS.md. Partition key must appear in hot path WHERE clauses from ACCESS_PATTERNS.md. Default partition must be created. Maintenance automation must be specified."
+          },
+          "sections": [
+            {
+              "id": "partition_candidates",
+              "heading": "Partition Candidates",
+              "description": { "th": "Tables ที่ได้ประโยชน์จาก partitioning พร้อม justification", "en": "Tables that benefit from partitioning with justification." },
+              "refs": ["schema_spec", "access_patterns", "constraints"],
+              "items": [
+                { "text_th": "Table name และ projected row count (จาก constraints)", "text_en": "Table name and projected row count from constraints" },
+                { "text_th": "Partition key column และ partition type (RANGE, LIST, HASH)", "text_en": "Partition key column and partition type (RANGE, LIST, HASH)" },
+                { "text_th": "Justification: query pruning benefit หรือ data lifecycle management", "text_en": "Justification: query pruning benefit or data lifecycle management" }
+              ]
+            },
+            {
+              "id": "partition_scheme",
+              "heading": "Partition Scheme",
+              "description": { "th": "DDL สำหรับ parent table และ child partitions", "en": "DDL for parent table and child partitions." },
+              "refs": ["schema_spec"],
+              "items": [
+                { "text_th": "CREATE TABLE ... PARTITION BY DDL", "text_en": "CREATE TABLE ... PARTITION BY DDL" },
+                { "text_th": "Child partition DDL with bounds (FOR VALUES FROM/TO, IN, WITH MODULUS)", "text_en": "Child partition DDL with bounds" },
+                { "text_th": "Naming convention สำหรับ partitions (เช่น appointments_y2026_m01)", "text_en": "Naming convention for partitions (e.g., appointments_y2026_m01)" },
+                { "text_th": "Default partition สำหรับ unmatched rows", "text_en": "Default partition for unmatched rows" }
+              ]
+            },
+            {
+              "id": "partition_pruning",
+              "heading": "Partition Pruning & Query Optimization",
+              "description": { "th": "EXPLAIN output แสดง partition pruning และ GUC settings ที่ต้องการ", "en": "EXPLAIN output showing partition pruning and required GUC settings." },
+              "refs": ["access_patterns"],
+              "items": [
+                { "text_th": "Example query with WHERE clause บน partition key", "text_en": "Example query with WHERE clause on partition key" },
+                { "text_th": "EXPLAIN output แสดง Seq Scan บน child partitions เท่านั้น", "text_en": "EXPLAIN output showing Seq Scan on subset of partitions only" },
+                { "text_th": "enable_partition_pruning = on (default) verification", "text_en": "Verify enable_partition_pruning = on (default)" }
+              ]
+            },
+            {
+              "id": "partition_maintenance",
+              "heading": "Partition Maintenance",
+              "description": { "th": "Automation สำหรับสร้าง/ลบ partitions และ archival", "en": "Automation for creating/dropping partitions and archival." },
+              "refs": ["constraints"],
+              "items": [
+                { "text_th": "pg_partman หรือ cron job สำหรับ automatic partition creation", "text_en": "pg_partman or cron job for automatic partition creation" },
+                { "text_th": "Retention policy — DROP หรือ DETACH old partitions", "text_en": "Retention policy — DROP or DETACH old partitions" },
+                { "text_th": "DETACH PARTITION CONCURRENTLY สำหรับ zero-downtime archival (PG 14+)", "text_en": "DETACH PARTITION CONCURRENTLY for zero-downtime archival (PG 14+)" }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "security",
+          "filename": "SECURITY.md",
+          "title": "Database Security",
+          "description": {
+            "th": "PostgreSQL-native security — role hierarchy, Row-Level Security (RLS), PDPA column classification, encryption, pg_audit",
+            "en": "PostgreSQL-native security — role hierarchy, Row-Level Security (RLS), PDPA column classification, pgcrypto encryption, pg_audit."
+          },
+          "priority": "P0",
+          "depends_on": ["schema_spec", "constraints"],
+          "output_format": {
+            "type": "markdown",
+            "suggested_headings": ["Role Hierarchy & Privileges", "Row-Level Security (RLS)", "PDPA Data Classification", "Encryption Strategy", "Audit Logging (pg_audit)"]
+          },
+          "agent_hints": {
+            "instruction": "Generate a SECURITY.md focused on PostgreSQL-native security. Define a role hierarchy with principle of least privilege: separate roles for app_read, app_write, analyst_readonly, dba, migration_runner. Implement RLS with USING (row filter for SELECT/UPDATE/DELETE) and WITH CHECK (row filter for INSERT/UPDATE) policies. Classify every column by PDPA sensitivity (Personal, Sensitive, Non-personal). Configure pg_audit for compliance. Document column-level encryption using pgcrypto pgp_sym_encrypt/pgp_sym_decrypt for Sensitive fields. Use column-level GRANT/REVOKE for PII columns. Application-layer auth (JWT, OAuth) is out of scope for this document.",
+            "input_context": "Tables and columns come from SCHEMA_SPEC.md. PDPA requirements come from CONSTRAINTS.md. Stakeholder roles from STAKEHOLDERS.md determine which PG roles to create.",
+            "estimated_length": "700-1200 words",
+            "validation": "Every role must follow least privilege. RLS must be enabled on all tables containing multi-tenant data or PDPA-sensitive data. Every Sensitive-classified column must have encryption or column-level REVOKE. pg_audit must be configured with explicit log scope."
+          },
+          "sections": [
+            {
+              "id": "role_hierarchy",
+              "heading": "Role Hierarchy & Privileges",
+              "description": { "th": "PG roles, GRANT/REVOKE statements, และ least privilege design", "en": "PG roles, GRANT/REVOKE statements, and least privilege design." },
+              "refs": ["stakeholders", "schema_spec"],
+              "items": [
+                { "text_th": "Role name และ purpose (app_read, app_write, analyst_readonly, dba, migration_runner)", "text_en": "Role name and purpose" },
+                { "text_th": "Schema-level privileges (USAGE, CREATE)", "text_en": "Schema-level privileges (USAGE, CREATE)" },
+                { "text_th": "Table-level privileges (SELECT, INSERT, UPDATE, DELETE)", "text_en": "Table-level privileges" },
+                { "text_th": "Column-level privileges สำหรับ sensitive data (REVOKE SELECT ON COLUMN)", "text_en": "Column-level privileges for sensitive data" }
+              ]
+            },
+            {
+              "id": "rls_policies",
+              "heading": "Row-Level Security (RLS)",
+              "description": { "th": "RLS policies สำหรับ multi-tenant หรือ role-based row filtering", "en": "RLS policies for multi-tenant or role-based row filtering." },
+              "refs": ["schema_spec", "stakeholders"],
+              "items": [
+                { "text_th": "Table name และ ALTER TABLE ... ENABLE ROW LEVEL SECURITY", "text_en": "Table name and ENABLE ROW LEVEL SECURITY" },
+                { "text_th": "CREATE POLICY DDL พร้อม USING clause (row filter for SELECT)", "text_en": "CREATE POLICY DDL with USING clause (SELECT row filter)" },
+                { "text_th": "WITH CHECK clause (row filter for INSERT/UPDATE)", "text_en": "WITH CHECK clause (INSERT/UPDATE row filter)" },
+                { "text_th": "FORCE ROW LEVEL SECURITY สำหรับ table owner bypass prevention", "text_en": "FORCE ROW LEVEL SECURITY to prevent owner bypass" }
+              ]
+            },
+            {
+              "id": "pdpa_classification",
+              "heading": "PDPA Data Classification",
+              "description": { "th": "Per-column sensitivity classification ตาม PDPA", "en": "Per-column PDPA sensitivity classification." },
+              "refs": ["data_dictionary", "constraints"],
+              "items": [
+                { "text_th": "schema.table.column และ PDPA classification (Personal, Sensitive, Non-personal)", "text_en": "schema.table.column and PDPA classification (Personal, Sensitive, Non-personal)" },
+                { "text_th": "Legal basis for collection (consent, contract, legal obligation)", "text_en": "Legal basis for data collection" },
+                { "text_th": "Retention period และ erasure/anonymization method", "text_en": "Retention period and erasure/anonymization method" },
+                { "text_th": "Encryption requirement (column-level encryption required?)", "text_en": "Encryption requirement (column-level encryption required?)" }
+              ]
+            },
+            {
+              "id": "encryption_strategy",
+              "heading": "Encryption Strategy",
+              "description": { "th": "At-rest encryption และ column-level encryption ด้วย pgcrypto", "en": "At-rest encryption and column-level encryption using pgcrypto." },
+              "refs": ["constraints"],
+              "items": [
+                { "text_th": "At-rest encryption (cloud-managed KMS หรือ TDE)", "text_en": "At-rest encryption (cloud-managed KMS or TDE)" },
+                { "text_th": "Column-level encryption ด้วย pgcrypto (pgp_sym_encrypt/pgp_sym_decrypt)", "text_en": "Column-level encryption using pgcrypto" },
+                { "text_th": "Key management approach และ key rotation procedure", "text_en": "Key management approach and key rotation procedure" },
+                { "text_th": "Performance impact ของ encrypted columns บน queries", "text_en": "Performance impact of encrypted columns on queries" }
+              ]
+            },
+            {
+              "id": "audit_logging",
+              "heading": "Audit Logging (pg_audit)",
+              "description": { "th": "pg_audit configuration สำหรับ compliance audit trail", "en": "pg_audit configuration for compliance audit trail." },
+              "refs": ["constraints"],
+              "items": [
+                { "text_th": "pgaudit.log setting (READ, WRITE, DDL, ROLE, ALL)", "text_en": "pgaudit.log setting scope" },
+                { "text_th": "pgaudit.role สำหรับ selective auditing ของ specific role", "text_en": "pgaudit.role for selective role-based auditing" },
+                { "text_th": "Log rotation และ retention ตาม PDPA requirement", "text_en": "Log rotation and retention per PDPA requirement" }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "phase_operations",
+      "order": 4,
+      "title": { "th": "Operations", "en": "Operations" },
+      "description": {
+        "th": "เป้าหมาย: เตรียมความพร้อมด้านการ deploy, ทดสอบ, บำรุงรักษา และ operate database ใน production",
+        "en": "Goal: Prepare for deployment, testing, maintenance, and production operations of the database."
+      },
+      "documents": [
+        {
+          "id": "migration_strategy",
+          "filename": "MIGRATION_STRATEGY.md",
+          "title": "Migration Strategy",
+          "description": {
+            "th": "Migration tooling, zero-downtime DDL patterns สำหรับ PostgreSQL, legacy data migration, และ rollback procedures",
+            "en": "Migration tooling, PostgreSQL zero-downtime DDL patterns, legacy data migration, and rollback procedures."
+          },
+          "priority": "P0",
+          "depends_on": ["schema_spec", "constraints"],
+          "output_format": {
+            "type": "markdown",
+            "suggested_headings": ["Migration Tooling", "Zero-Downtime DDL Patterns", "Data Migration from Legacy", "Seed & Reference Data", "Rollback Procedures"]
+          },
+          "agent_hints": {
+            "instruction": "Generate a MIGRATION_STRATEGY.md for PostgreSQL schema changes. Document the chosen migration tool (sqitch, Flyway, golang-migrate, Alembic) with directory structure and file naming conventions. Catalog zero-downtime DDL patterns specific to PostgreSQL: (1) CREATE INDEX CONCURRENTLY — no table lock, (2) ALTER TABLE ADD COLUMN with DEFAULT — instant in PG 11+ via fast path, (3) safe NOT NULL addition via CHECK CONSTRAINT (NOT VALID) then VALIDATE CONSTRAINT, (4) online column type change via new-column + backfill trigger + rename pattern, (5) table rename via CREATE VIEW. Reference CONSTRAINTS.md PG version for each pattern's availability. Every migration must have a documented rollback procedure.",
+            "input_context": "DDL from SCHEMA_SPEC.md defines what to migrate. PG version from CONSTRAINTS.md determines which DDL patterns are safe and available (PG 11+ instant ADD COLUMN, PG 14+ DETACH PARTITION CONCURRENTLY).",
+            "estimated_length": "600-1000 words",
+            "validation": "Every DDL pattern must note the minimum PG version. Every migration step must have a rollback. Legacy data migration must include a validation/reconciliation step. Migration tool must be installed without superuser where possible."
+          },
+          "sections": [
+            {
+              "id": "migration_tooling",
+              "heading": "Migration Tooling",
+              "description": { "th": "Migration tool ที่เลือกและ directory structure", "en": "Chosen migration tool and directory structure." },
+              "refs": ["schema_spec"],
+              "items": [
+                { "text_th": "Tool name, version, และ rationale (sqitch, Flyway, golang-migrate, Alembic)", "text_en": "Tool name, version, and rationale" },
+                { "text_th": "Directory structure สำหรับ migration files", "text_en": "Directory structure for migration files" },
+                { "text_th": "Naming convention (timestamp prefix vs sequential number)", "text_en": "File naming convention (timestamp prefix vs sequential number)" },
+                { "text_th": "Rollback/revert support ของ tool ที่เลือก", "text_en": "Rollback/revert support of the chosen tool" }
+              ]
+            },
+            {
+              "id": "zero_downtime_ddl",
+              "heading": "Zero-Downtime DDL Patterns",
+              "description": { "th": "PostgreSQL DDL patterns ที่ไม่ lock table", "en": "PostgreSQL DDL patterns that avoid table locks." },
+              "refs": ["schema_spec", "constraints"],
+              "items": [
+                { "text_th": "CREATE INDEX CONCURRENTLY — no AccessExclusiveLock, PG 8.2+", "text_en": "CREATE INDEX CONCURRENTLY — no AccessExclusiveLock" },
+                { "text_th": "ADD COLUMN with DEFAULT — instant fast path, PG 11+", "text_en": "ADD COLUMN with DEFAULT — instant via fast path, PG 11+" },
+                { "text_th": "Safe NOT NULL: ADD CHECK (col IS NOT NULL) NOT VALID → VALIDATE CONSTRAINT", "text_en": "Safe NOT NULL via NOT VALID CHECK then VALIDATE" },
+                { "text_th": "Column type change: new column + backfill trigger + atomic rename", "text_en": "Column type change via new-column + backfill trigger + rename" }
+              ]
+            },
+            {
+              "id": "data_migration",
+              "heading": "Data Migration from Legacy",
+              "description": { "th": "Migration ข้อมูลจาก legacy system", "en": "Migrating data from legacy systems." },
+              "refs": ["schema_spec", "constraints"],
+              "items": [
+                { "text_th": "Source system และ extraction method (pg_dump, logical replication, COPY, FDW)", "text_en": "Source system and extraction method" },
+                { "text_th": "Transformation rules และ data cleansing steps", "text_en": "Transformation rules and data cleansing steps" },
+                { "text_th": "Validation procedure หลัง migration (row counts, checksums, sample checks)", "text_en": "Post-migration validation procedure (row counts, checksums, sample checks)" }
+              ]
+            },
+            {
+              "id": "seed_reference_data",
+              "heading": "Seed & Reference Data",
+              "description": { "th": "การจัดการ master data และ lookup tables ผ่าน migration", "en": "Managing master data and lookup tables through migrations." },
+              "refs": ["schema_spec", "data_dictionary"],
+              "items": [
+                { "text_th": "รายการ reference/lookup tables และแหล่งที่มาของค่า", "text_en": "Reference/lookup tables and the source of their values" },
+                { "text_th": "Seed scripts ต้อง idempotent (INSERT ... ON CONFLICT DO NOTHING/UPDATE)", "text_en": "Seed scripts must be idempotent (INSERT ... ON CONFLICT DO NOTHING/UPDATE)" },
+                { "text_th": "Seed data เป็น migration หรือแยกไฟล์ต่อ environment (dev/staging/prod)", "text_en": "Seed data as migrations vs per-environment files (dev/staging/prod)" },
+                { "text_th": "การอัปเดตค่าใน lookup table ที่ production ใช้อยู่ (versioned seed migration)", "text_en": "Updating lookup values already used in production (versioned seed migration)" }
+              ]
+            },
+            {
+              "id": "rollback_procedures",
+              "heading": "Rollback Procedures",
+              "description": { "th": "วิธี undo migration แต่ละประเภท", "en": "How to undo each migration type." },
+              "refs": ["schema_spec", "constraints"],
+              "items": [
+                { "text_th": "DDL rollback (DROP INDEX CONCURRENTLY, DROP COLUMN)", "text_en": "DDL rollback (DROP INDEX CONCURRENTLY, DROP COLUMN)" },
+                { "text_th": "Data rollback (pg_dump snapshot ก่อน migration)", "text_en": "Data rollback using pre-migration pg_dump snapshot" },
+                { "text_th": "PITR as last resort — recovery_target_time procedure", "text_en": "PITR as last resort — recovery_target_time procedure" },
+                { "text_th": "Migration tool rollback commands (sqitch revert, flyway undo)", "text_en": "Migration tool rollback commands" }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "data_lifecycle",
+          "filename": "DATA_LIFECYCLE.md",
+          "title": "Data Lifecycle & Retention",
+          "description": {
+            "th": "Retention policy ต่อ table, archival strategy, PDPA erasure (right to be forgotten), และ purge jobs — ปิดช่องว่างที่ PDPA classification อย่างเดียวไม่พอ",
+            "en": "Per-table retention policy, archival strategy, PDPA erasure (right to be forgotten), and purge jobs — PDPA classification alone is not enough without retention limits."
+          },
+          "priority": "P1",
+          "depends_on": ["schema_spec", "partitioning", "security"],
+          "output_format": {
+            "type": "markdown",
+            "suggested_headings": ["Retention Policy per Table", "Archival Strategy", "PDPA Erasure (Right to be Forgotten)", "Purge & Cleanup Jobs"]
+          },
+          "agent_hints": {
+            "instruction": "Generate a DATA_LIFECYCLE.md defining how long each table's data lives and how it dies. For every table in SCHEMA_SPEC.md assign a retention period with legal/business justification — PDPA requires personal data be kept no longer than necessary. Define the archival path for expired data (partition detach, COPY to cold storage, or hard delete). Specify the erasure procedure for data-subject requests: which tables hold the person's data, deletion vs anonymization per table, cascade order respecting FK constraints, and audit evidence of completion. Define scheduled purge jobs (pg_cron or external scheduler) with monitoring hooks.",
+            "input_context": "Tables come from SCHEMA_SPEC.md. Partitioned tables from PARTITIONING.md archive via partition detach. PDPA sensitivity classes from SECURITY.md determine which tables need erasure support and stricter retention.",
+            "estimated_length": "400-700 words",
+            "validation": "Every table in SCHEMA_SPEC.md must have a retention period or an explicit 'keep forever' with justification. Every table holding Personal/Sensitive data per SECURITY.md must have an erasure procedure. Purge jobs must specify schedule, batch size, and monitoring alert."
+          },
+          "sections": [
+            {
+              "id": "retention_policy",
+              "heading": "Retention Policy per Table",
+              "description": { "th": "อายุข้อมูลของแต่ละ table พร้อมเหตุผลทางกฎหมาย/ธุรกิจ", "en": "Data lifetime per table with legal/business justification." },
+              "refs": ["schema_spec", "security"],
+              "items": [
+                { "text_th": "Table, retention period, และเหตุผล (กฎหมาย/ธุรกิจ)", "text_en": "Table, retention period, and justification (legal/business)" },
+                { "text_th": "PDPA sensitivity class จาก SECURITY.md ที่กำหนด retention ขั้นต่ำ/สูงสุด", "text_en": "PDPA sensitivity class from SECURITY.md driving min/max retention" },
+                { "text_th": "Tables ที่ keep forever ต้องมี justification ชัดเจน", "text_en": "Keep-forever tables require explicit justification" },
+                { "text_th": "จุดเริ่มนับอายุ (created_at, closed_at, last_activity)", "text_en": "Retention clock start point (created_at, closed_at, last_activity)" }
+              ]
+            },
+            {
+              "id": "archival_strategy",
+              "heading": "Archival Strategy",
+              "description": { "th": "เส้นทางของข้อมูลหมดอายุ — detach partition, cold storage, หรือ delete", "en": "Path for expired data — partition detach, cold storage, or delete." },
+              "refs": ["partitioning"],
+              "items": [
+                { "text_th": "Partitioned tables: DETACH PARTITION แล้ว archive/drop ตาม schedule", "text_en": "Partitioned tables: DETACH PARTITION then archive/drop on schedule" },
+                { "text_th": "Non-partitioned tables: batch COPY ไป cold storage แล้ว DELETE", "text_en": "Non-partitioned tables: batch COPY to cold storage then DELETE" },
+                { "text_th": "Archive format และ storage location (ไม่ระบุ vendor จริง)", "text_en": "Archive format and storage location (no real vendor names)" },
+                { "text_th": "Restore procedure จาก archive", "text_en": "Restore procedure from archive" }
+              ]
+            },
+            {
+              "id": "pdpa_erasure",
+              "heading": "PDPA Erasure (Right to be Forgotten)",
+              "description": { "th": "ขั้นตอนลบ/anonymize ข้อมูลส่วนบุคคลเมื่อเจ้าของข้อมูลร้องขอ", "en": "Procedure to delete/anonymize personal data on data-subject request." },
+              "refs": ["security", "schema_spec"],
+              "items": [
+                { "text_th": "รายการ tables ที่ถือข้อมูลของ data subject หนึ่งคน", "text_en": "Tables holding a single data subject's data" },
+                { "text_th": "ต่อ table: DELETE จริง หรือ anonymize (คง referential integrity)", "text_en": "Per table: hard DELETE or anonymize (preserving referential integrity)" },
+                { "text_th": "ลำดับการลบตาม FK cascade order", "text_en": "Deletion order respecting FK cascade order" },
+                { "text_th": "Audit evidence ว่า erasure สำเร็จ (ไม่เก็บข้อมูลที่ถูกลบไว้ใน log)", "text_en": "Audit evidence of completed erasure (without retaining the erased data in logs)" },
+                { "text_th": "SLA การตอบสนอง request (วัน)", "text_en": "Request response SLA in days" }
+              ]
+            },
+            {
+              "id": "purge_jobs",
+              "heading": "Purge & Cleanup Jobs",
+              "description": { "th": "Scheduled jobs ที่บังคับ retention policy อัตโนมัติ", "en": "Scheduled jobs that enforce the retention policy automatically." },
+              "refs": [],
+              "items": [
+                { "text_th": "Job name, schedule (pg_cron หรือ external scheduler), และ target tables", "text_en": "Job name, schedule (pg_cron or external scheduler), and target tables" },
+                { "text_th": "Batch size และ throttling กัน lock contention", "text_en": "Batch size and throttling to avoid lock contention" },
+                { "text_th": "Monitoring alert เมื่อ job fail หรือ purge volume ผิดปกติ", "text_en": "Monitoring alert on job failure or abnormal purge volume" },
+                { "text_th": "Dry-run mode สำหรับตรวจก่อนลบจริง", "text_en": "Dry-run mode to review before actual deletion" }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "testing_strategy",
+          "filename": "TESTING_STRATEGY.md",
+          "title": "Testing Strategy",
+          "description": {
+            "th": "pgTAP tests สำหรับ constraints, RLS, triggers, functions — plus performance benchmarks และ migration tests",
+            "en": "pgTAP tests for constraints, RLS, triggers, functions — plus pgbench performance benchmarks and migration tests."
+          },
+          "priority": "P1",
+          "depends_on": ["schema_spec", "indexing_strategy", "security"],
+          "output_format": {
+            "type": "markdown",
+            "suggested_headings": ["Constraint Tests (pgTAP)", "RLS Policy Tests", "Performance Benchmarks", "Migration Tests", "Data Integrity Tests"]
+          },
+          "agent_hints": {
+            "instruction": "Generate a TESTING_STRATEGY.md using pgTAP as the primary database test framework. Cover: (1) constraint tests using pgTAP functions (has_table, has_column, col_is_pk, col_not_null, col_type_is, fk_ok, has_check, has_index) to verify every constraint from SCHEMA_SPEC.md; (2) RLS tests using SET ROLE to verify row visibility per role — test that forbidden rows are invisible and FORCE RLS works; (3) performance benchmarks using pgbench custom scripts or EXPLAIN (ANALYZE, BUFFERS) for every hot path from ACCESS_PATTERNS.md; (4) migration tests (forward, rollback, idempotency); (5) data integrity tests for triggers, functions, and materialized views. All tests runnable in CI via pg_prove.",
+            "input_context": "Constraints from SCHEMA_SPEC.md. Index performance expectations from INDEXING_STRATEGY.md. RLS policies from SECURITY.md. Hot path latency SLAs from ACCESS_PATTERNS.md.",
+            "estimated_length": "600-1000 words",
+            "validation": "Every CHECK/FK/UNIQUE/PK constraint in SCHEMA_SPEC.md must have a pgTAP test. Every RLS policy in SECURITY.md must have a SET ROLE test. Performance benchmarks must reference hot path IDs. pg_prove command must be documented."
+          },
+          "sections": [
+            {
+              "id": "constraint_tests",
+              "heading": "Constraint Tests (pgTAP)",
+              "description": { "th": "pgTAP unit tests สำหรับทุก constraint ใน SCHEMA_SPEC.md", "en": "pgTAP unit tests for every constraint in SCHEMA_SPEC.md." },
+              "refs": ["schema_spec"],
+              "items": [
+                { "text_th": "pgTAP functions: has_table, has_column, col_is_pk, col_not_null, col_type_is", "text_en": "pgTAP functions: has_table, has_column, col_is_pk, col_not_null, col_type_is" },
+                { "text_th": "fk_ok() tests สำหรับทุก FK relationship", "text_en": "fk_ok() tests for every FK relationship" },
+                { "text_th": "has_check() tests สำหรับทุก CHECK constraint", "text_en": "has_check() tests for every CHECK constraint" },
+                { "text_th": "has_index() tests สำหรับ index ทุกตัวใน indexing_strategy", "text_en": "has_index() tests for every index in indexing_strategy" }
+              ]
+            },
+            {
+              "id": "rls_tests",
+              "heading": "RLS Policy Tests",
+              "description": { "th": "Tests ตรวจสอบว่า Row-Level Security ทำงานถูกต้องตาม policy", "en": "Tests verifying RLS policies work correctly per role." },
+              "refs": ["security"],
+              "items": [
+                { "text_th": "SET ROLE to test as different roles (app_read, analyst_readonly)", "text_en": "SET ROLE to test as different roles" },
+                { "text_th": "Verify forbidden rows are invisible (SELECT count must match expected)", "text_en": "Verify forbidden rows are invisible" },
+                { "text_th": "Verify WITH CHECK blocks unauthorized INSERT/UPDATE", "text_en": "Verify WITH CHECK blocks unauthorized INSERT/UPDATE" },
+                { "text_th": "Verify FORCE ROW LEVEL SECURITY applies to table owner", "text_en": "Verify FORCE RLS applies to table owner" }
+              ]
+            },
+            {
+              "id": "performance_benchmarks",
+              "heading": "Performance Benchmarks",
+              "description": { "th": "pgbench custom scripts และ EXPLAIN ANALYZE สำหรับ hot paths", "en": "pgbench custom scripts and EXPLAIN ANALYZE for hot paths." },
+              "refs": ["access_patterns", "indexing_strategy"],
+              "items": [
+                { "text_th": "Benchmark name และ hot path ID ที่อ้างอิง", "text_en": "Benchmark name and referenced hot path ID" },
+                { "text_th": "pgbench custom script หรือ SQL query", "text_en": "pgbench custom script or SQL query" },
+                { "text_th": "EXPLAIN (ANALYZE, BUFFERS) แสดง index usage", "text_en": "EXPLAIN (ANALYZE, BUFFERS) showing index usage" },
+                { "text_th": "Pass/fail threshold ตาม p99 latency SLA จาก access_patterns", "text_en": "Pass/fail threshold per p99 latency SLA from access_patterns" }
+              ]
+            },
+            {
+              "id": "migration_tests",
+              "heading": "Migration Tests",
+              "description": { "th": "Tests ตรวจสอบว่า migrations ทำงานถูกต้องและ rollback ได้", "en": "Tests verifying migrations run correctly and rollback works." },
+              "refs": ["migration_strategy", "schema_spec"],
+              "items": [
+                { "text_th": "Forward migration test (apply, verify schema matches expected)", "text_en": "Forward migration test (apply and verify schema)" },
+                { "text_th": "Rollback test (revert, verify schema matches previous state)", "text_en": "Rollback test (revert and verify previous state)" },
+                { "text_th": "Idempotency test (apply migration twice without error)", "text_en": "Idempotency test (apply twice without error)" },
+                { "text_th": "CI integration command (pg_prove + migration tool)", "text_en": "CI integration command" }
+              ]
+            },
+            {
+              "id": "data_integrity_tests",
+              "heading": "Data Integrity Tests",
+              "description": { "th": "Tests สำหรับ triggers, functions, materialized views, และ referential integrity", "en": "Tests for triggers, functions, materialized views, and referential integrity." },
+              "refs": ["schema_spec", "normalization"],
+              "items": [
+                { "text_th": "FK referential integrity tests หลัง bulk operations", "text_en": "FK referential integrity tests after bulk operations" },
+                { "text_th": "Trigger side-effect verification (audit log row created, computed field updated)", "text_en": "Trigger side-effect verification" },
+                { "text_th": "Stored function output correctness tests", "text_en": "Stored function output correctness tests" },
+                { "text_th": "Materialized view consistency after REFRESH MATERIALIZED VIEW", "text_en": "Materialized view consistency after refresh" }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "changelog",
+          "filename": "CHANGELOG.md",
+          "title": "Schema Changelog",
+          "description": {
+            "th": "Keep a Changelog format สำหรับ DDL changes — Added, Changed, Breaking — พร้อม breaking change policy",
+            "en": "Keep a Changelog format for DDL changes — Added, Changed, Breaking — with a defined breaking change policy."
+          },
+          "priority": "P1",
+          "depends_on": ["schema_spec"],
+          "output_format": {
+            "type": "markdown",
+            "suggested_headings": ["Unreleased", "Version History", "Breaking vs Non-Breaking Changes"]
+          },
+          "agent_hints": {
+            "instruction": "Generate an initial CHANGELOG.md using Keep a Changelog format adapted for database schema changes. Track DDL changes in three categories: Added (new tables/columns/indexes/functions), Changed (constraint modifications, type changes, DEFAULT changes), and Breaking (DROP TABLE/COLUMN, column type narrowing, constraint tightening, enum value removal). Define a breaking change policy: non-breaking changes can be deployed without app-team coordination; breaking changes require a migration window notice and application-team sign-off. Initialize with schema version 1.0.0 listing all tables from SCHEMA_SPEC.md.",
+            "input_context": "Initial schema from SCHEMA_SPEC.md lists all tables, indexes, and constraints for the v1.0.0 entry. Breaking change policy must be consistent with MIGRATION_STRATEGY.md zero-downtime patterns.",
+            "estimated_length": "200-400 words",
+            "validation": "Must follow Keep a Changelog format. Initial [1.0.0] entry must list all tables from SCHEMA_SPEC.md. Breaking change policy must define what requires a migration window."
+          },
+          "sections": [
+            {
+              "id": "unreleased",
+              "heading": "Unreleased",
+              "description": { "th": "Pending schema changes ที่ยังไม่ได้ release", "en": "Pending schema changes not yet released." },
+              "refs": ["schema_spec"],
+              "items": [
+                { "text_th": "Added — tables, columns, indexes ใหม่ที่เพิ่ม", "text_en": "Added — new tables, columns, indexes" },
+                { "text_th": "Changed — column type changes, constraint modifications", "text_en": "Changed — column type changes, constraint modifications" },
+                { "text_th": "Deprecated — columns/tables ที่กำลังจะถูกลบ", "text_en": "Deprecated — columns/tables being phased out" }
+              ]
+            },
+            {
+              "id": "version_history",
+              "heading": "Version History",
+              "description": { "th": "Released schema versions พร้อม DDL changes", "en": "Released schema versions with DDL changes." },
+              "refs": ["schema_spec"],
+              "items": [
+                { "text_th": "[x.y.z] — YYYY-MM-DD format", "text_en": "[x.y.z] — YYYY-MM-DD format" },
+                { "text_th": "DDL changes (Added/Changed/Removed/Fixed)", "text_en": "DDL changes (Added/Changed/Removed/Fixed)" },
+                { "text_th": "Breaking changes พร้อม migration notes", "text_en": "Breaking changes with migration notes" }
+              ]
+            },
+            {
+              "id": "breaking_change_policy",
+              "heading": "Breaking vs Non-Breaking Changes",
+              "description": { "th": "Classification rules สำหรับ breaking vs non-breaking schema changes", "en": "Classification rules for breaking vs non-breaking schema changes." },
+              "refs": ["migration_strategy"],
+              "items": [
+                { "text_th": "Non-breaking: ADD COLUMN with DEFAULT, ADD INDEX, new table, ADD CHECK (NOT VALID)", "text_en": "Non-breaking: ADD COLUMN with DEFAULT, ADD INDEX, new table" },
+                { "text_th": "Breaking: DROP COLUMN/TABLE, type change, constraint tightening, enum value removal", "text_en": "Breaking: DROP COLUMN/TABLE, type change, constraint tightening" },
+                { "text_th": "Policy: breaking changes require migration window notice and application team sign-off", "text_en": "Policy: breaking changes require migration window and app team sign-off" }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "runbook",
+          "filename": "RUNBOOK.md",
+          "title": "Operations Runbook",
+          "description": {
+            "th": "Production operations — backup/PITR, vacuum maintenance, monitoring, incident response, scaling, RPO/RTO verification",
+            "en": "Production operations — backup/PITR, vacuum maintenance, monitoring, incident response, scaling, and RPO/RTO verification drills."
+          },
+          "priority": "P0",
+          "depends_on": ["schema_spec", "migration_strategy", "security", "partitioning"],
+          "output_format": {
+            "type": "markdown",
+            "suggested_headings": ["Backup & PITR", "Vacuum & Maintenance", "Monitoring & Alerting", "Incident Response", "Scaling Procedures", "RPO/RTO Verification"]
+          },
+          "agent_hints": {
+            "instruction": "Generate a RUNBOOK.md for PostgreSQL production operations. Cover: (1) backup strategy using pg_basebackup + WAL archiving (pgBackRest or barman) with PITR recovery procedure using recovery_target_time; (2) vacuum maintenance — autovacuum tuning per table, VACUUM FULL scheduling, REINDEX CONCURRENTLY; (3) monitoring using pg_stat_statements (top queries by total_time), pg_stat_activity (active connections, idle-in-transaction), pg_stat_user_tables (dead tuples, last autovacuum) with alert thresholds; (4) incident response with severity levels (P0: database down, P1: replication lag, P2: slow queries) and step-by-step procedures; (5) scaling procedures; (6) RPO/RTO verification drills with quarterly schedule.",
+            "input_context": "RPO/RTO targets come from CONSTRAINTS.md. Partition maintenance procedures come from PARTITIONING.md. Security incident response references SECURITY.md. Migration rollback references MIGRATION_STRATEGY.md.",
+            "estimated_length": "800-1300 words",
+            "validation": "Every alert must have a numeric threshold and a response action. Backup must specify retention period matching CONSTRAINTS.md RPO. PITR procedure must include recovery_target_time syntax. RPO/RTO verification must specify a quarterly drill schedule."
+          },
+          "sections": [
+            {
+              "id": "backup_pitr",
+              "heading": "Backup & PITR",
+              "description": { "th": "Backup strategy และ point-in-time recovery procedures", "en": "Backup strategy and point-in-time recovery procedures." },
+              "refs": ["constraints"],
+              "items": [
+                { "text_th": "pg_basebackup schedule และ WAL archiving config (archive_command, pgBackRest, barman)", "text_en": "pg_basebackup schedule and WAL archiving config" },
+                { "text_th": "PITR recovery procedure (recovery_target_time syntax)", "text_en": "PITR recovery procedure with recovery_target_time syntax" },
+                { "text_th": "Backup retention policy ตาม CONSTRAINTS.md RPO", "text_en": "Backup retention policy per CONSTRAINTS.md RPO" },
+                { "text_th": "Backup verification (pg_verifybackup หรือ test restore monthly)", "text_en": "Backup verification (pg_verifybackup or monthly test restore)" }
+              ]
+            },
+            {
+              "id": "vacuum_maintenance",
+              "heading": "Vacuum & Maintenance",
+              "description": { "th": "Autovacuum tuning, manual VACUUM, REINDEX strategy", "en": "Autovacuum tuning, manual VACUUM, and REINDEX strategy." },
+              "refs": ["schema_spec", "data_lifecycle"],
+              "items": [
+                { "text_th": "autovacuum_vacuum_scale_factor per table (ลด สำหรับ high-churn tables)", "text_en": "autovacuum_vacuum_scale_factor per table (reduce for high-churn)" },
+                { "text_th": "VACUUM FULL procedure พร้อม downtime window (เมื่อ bloat > threshold)", "text_en": "VACUUM FULL procedure with downtime window (when bloat exceeds threshold)" },
+                { "text_th": "REINDEX CONCURRENTLY schedule สำหรับ bloated indexes", "text_en": "REINDEX CONCURRENTLY schedule for bloated indexes" },
+                { "text_th": "Monitoring: pg_stat_user_tables (n_dead_tup, last_autovacuum)", "text_en": "Monitoring via pg_stat_user_tables (n_dead_tup, last_autovacuum)" }
+              ]
+            },
+            {
+              "id": "monitoring",
+              "heading": "Monitoring & Alerting",
+              "description": { "th": "Key metrics และ alert thresholds", "en": "Key metrics and alert thresholds." },
+              "refs": ["constraints"],
+              "items": [
+                { "text_th": "pg_stat_activity: active connections, long-running queries > Xs, idle-in-transaction", "text_en": "pg_stat_activity: connections, long-running queries, idle-in-transaction" },
+                { "text_th": "pg_stat_statements: top queries by total_time, mean_time > SLA threshold", "text_en": "pg_stat_statements: top queries by total_time, mean_time vs SLA" },
+                { "text_th": "pg_stat_user_tables: seq_scan on large tables, dead tuple ratio", "text_en": "pg_stat_user_tables: seq scans on large tables, dead tuple ratio" },
+                { "text_th": "Replication lag threshold, disk usage alert, connection pool saturation", "text_en": "Replication lag threshold, disk usage, connection pool saturation" }
+              ]
+            },
+            {
+              "id": "incident_response",
+              "heading": "Incident Response",
+              "description": { "th": "Severity levels และ step-by-step runbook สำหรับ failures ที่พบบ่อย", "en": "Severity levels and step-by-step procedures for common failures." },
+              "refs": ["security", "migration_strategy"],
+              "items": [
+                { "text_th": "P0: database down — immediate failover procedure", "text_en": "P0: database down — immediate failover procedure" },
+                { "text_th": "P1: replication lag > threshold — diagnose and recover", "text_en": "P1: replication lag > threshold — diagnose and recover" },
+                { "text_th": "Table lock investigation (pg_locks JOIN pg_stat_activity, pg_terminate_backend)", "text_en": "Table lock investigation using pg_locks and pg_terminate_backend" },
+                { "text_th": "Disk full emergency — VACUUM, drop/move old partitions", "text_en": "Disk full emergency — VACUUM, drop/move old partitions" }
+              ]
+            },
+            {
+              "id": "scaling_procedures",
+              "heading": "Scaling Procedures",
+              "description": { "th": "Vertical scaling, read replicas, connection pooling", "en": "Vertical scaling, read replica addition, and connection pool tuning." },
+              "refs": ["constraints", "partitioning"],
+              "items": [
+                { "text_th": "Vertical scaling — increase shared_buffers (25% of RAM), work_mem, effective_cache_size", "text_en": "Vertical scaling — shared_buffers, work_mem, effective_cache_size tuning" },
+                { "text_th": "Read replica addition procedure และ routing logic", "text_en": "Read replica addition procedure and read routing" },
+                { "text_th": "Connection pool scaling (pgbouncer pool_size, max_client_conn)", "text_en": "Connection pool scaling (pgbouncer pool_size, max_client_conn)" }
+              ]
+            },
+            {
+              "id": "rpo_rto_verification",
+              "heading": "RPO/RTO Verification",
+              "description": { "th": "Quarterly drills เพื่อ verify recovery objectives ตาม CONSTRAINTS.md", "en": "Quarterly drills to verify recovery objectives from CONSTRAINTS.md." },
+              "refs": ["constraints", "migration_strategy"],
+              "items": [
+                { "text_th": "RPO test — restore from backup, measure data loss window vs target", "text_en": "RPO test — restore from backup, measure data loss window vs target" },
+                { "text_th": "RTO test — failover to replica, measure downtime vs target", "text_en": "RTO test — failover to replica, measure downtime vs target" },
+                { "text_th": "Quarterly drill schedule และ results documentation", "text_en": "Quarterly drill schedule and results documentation" }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "readme",
+          "filename": "README.md",
+          "title": "README",
+          "description": {
+            "th": "Quick start guide — local PostgreSQL setup, migration quickstart, psql cheat sheet, และ pgTAP test runner",
+            "en": "Quick start guide — local PostgreSQL setup, migration quickstart, psql cheat sheet, and pgTAP test runner."
+          },
+          "priority": "P1",
+          "depends_on": ["schema_spec", "migration_strategy", "testing_strategy"],
+          "output_format": {
+            "type": "markdown",
+            "suggested_headings": ["Overview", "Local PostgreSQL Setup", "Migration Quick Start", "psql Cheat Sheet", "Testing Quick Start"]
+          },
+          "agent_hints": {
+            "instruction": "Generate a README.md that lets a new developer set up and work with the database in under 15 minutes. Include: (1) 2-sentence overview of what this database does and its key design decisions; (2) Docker Compose setup for local PG with all required extensions from CONSTRAINTS.md; (3) migration tool quickstart with apply/rollback/status commands from MIGRATION_STRATEGY.md; (4) psql cheat sheet with the 10 most useful commands (connect, list tables, describe, running queries, index usage, table sizes, EXPLAIN ANALYZE); (5) pgTAP test runner quickstart. Keep it copy-pasteable — every command block must be runnable as-is.",
+            "input_context": "PG version and extensions from CONSTRAINTS.md. Migration tool commands from MIGRATION_STRATEGY.md. Test framework commands from TESTING_STRATEGY.md. Schema overview from SCHEMA_SPEC.md.",
+            "estimated_length": "400-700 words",
+            "validation": "Docker Compose must include all extensions from CONSTRAINTS.md. Migration commands must match MIGRATION_STRATEGY.md tool. psql commands must be syntactically correct. README must include a quick-start that completes in < 15 minutes."
+          },
+          "sections": [
+            {
+              "id": "overview",
+              "heading": "Overview",
+              "description": { "th": "สรุปว่า database นี้ทำอะไรและ key design decisions", "en": "Summary of what this database does and key design decisions." },
+              "refs": ["schema_spec"],
+              "items": [
+                { "text_th": "Purpose ของ database ใน 1-2 ประโยค", "text_en": "Purpose of the database in 1-2 sentences" },
+                { "text_th": "Key design decisions (partitioning strategy, PG features used)", "text_en": "Key design decisions (partitioning strategy, PG-specific features used)" },
+                { "text_th": "Schema organization (bounded contexts จาก domain_model)", "text_en": "Schema organization from domain_model bounded contexts" }
+              ]
+            },
+            {
+              "id": "local_setup",
+              "heading": "Local PostgreSQL Setup",
+              "description": { "th": "Docker Compose setup สำหรับ local development", "en": "Docker Compose setup for local development." },
+              "refs": ["constraints", "schema_spec"],
+              "items": [
+                { "text_th": "docker-compose.yml พร้อม PG version และ environment variables", "text_en": "docker-compose.yml with PG version and environment variables" },
+                { "text_th": "Extension installation commands (CREATE EXTENSION IF NOT EXISTS ...)", "text_en": "Extension installation commands" },
+                { "text_th": "Environment variables: PGHOST, PGPORT, PGUSER, PGPASSWORD, PGDATABASE", "text_en": "Environment variables: PGHOST, PGPORT, PGUSER, PGPASSWORD, PGDATABASE" }
+              ]
+            },
+            {
+              "id": "migration_quickstart",
+              "heading": "Migration Quick Start",
+              "description": { "th": "Commands สำหรับ run migrations", "en": "Commands for running migrations." },
+              "refs": ["migration_strategy"],
+              "items": [
+                { "text_th": "Install migration tool command", "text_en": "Install migration tool command" },
+                { "text_th": "Apply all migrations command", "text_en": "Apply all migrations command" },
+                { "text_th": "Rollback last migration command", "text_en": "Rollback last migration command" },
+                { "text_th": "Check migration status command", "text_en": "Check migration status command" }
+              ]
+            },
+            {
+              "id": "psql_cheat_sheet",
+              "heading": "psql Cheat Sheet",
+              "description": { "th": "10 psql commands ที่ developer ใช้บ่อยที่สุด", "en": "10 most useful psql commands for developers." },
+              "refs": ["schema_spec"],
+              "items": [
+                { "text_th": "Connect: psql $DATABASE_URL", "text_en": "Connect: psql $DATABASE_URL" },
+                { "text_th": "List tables by schema: \\dt schema.*", "text_en": "List tables by schema: \\dt schema.*" },
+                { "text_th": "Describe table: \\d+ schema.tablename", "text_en": "Describe table: \\d+ schema.tablename" },
+                { "text_th": "Show running queries, table sizes, index usage (pg_stat_* queries)", "text_en": "Show running queries, table sizes, index usage via pg_stat_* views" }
+              ]
+            },
+            {
+              "id": "testing_quickstart",
+              "heading": "Testing Quick Start",
+              "description": { "th": "Commands สำหรับ run pgTAP tests", "en": "Commands for running pgTAP tests." },
+              "refs": ["testing_strategy"],
+              "items": [
+                { "text_th": "Install pgTAP (CREATE EXTENSION pgtap)", "text_en": "Install pgTAP (CREATE EXTENSION pgtap)" },
+                { "text_th": "Run all tests: pg_prove -U postgres tests/*.sql", "text_en": "Run all tests: pg_prove -U postgres tests/*.sql" },
+                { "text_th": "CI integration command", "text_en": "CI integration command" }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "deliverables": {
+    "title": { "th": "Deliverables", "en": "Deliverables" },
+    "description": {
+      "th": "Artifacts และ readiness gates ที่ต้องผ่านก่อน database พร้อม production",
+      "en": "Artifacts and readiness gates required before the database is production-ready."
+    },
+    "artifacts": [
+      {
+        "id": "schema_ddl",
+        "title": { "th": "Schema DDL Scripts", "en": "Schema DDL Scripts" },
+        "items": [
+          { "text_th": "DDL scripts ครบถ้วน (CREATE EXTENSION, SCHEMA, TYPE, DOMAIN, TABLE) version-controlled ใน git", "text_en": "Complete DDL scripts (CREATE EXTENSION, SCHEMA, TYPE, DOMAIN, TABLE) under version control" },
+          { "text_th": "DDL runnable บน fresh PG instance เพื่อสร้าง complete schema ได้", "text_en": "DDL runnable on a fresh PG instance to produce the complete schema" },
+          { "text_th": "All constraints, indexes, triggers, functions included ใน DDL", "text_en": "All constraints, indexes, triggers, and functions included in DDL" }
+        ]
+      },
+      {
+        "id": "migration_files",
+        "title": { "th": "Migration Files", "en": "Migration Files" },
+        "items": [
+          { "text_th": "Migration files สำหรับ chosen tool (sqitch/Flyway) ใน git", "text_en": "Migration files for chosen tool (sqitch/Flyway) under version control" },
+          { "text_th": "ทุก migration มี verified rollback/revert script", "text_en": "Every migration has a verified rollback/revert script" },
+          { "text_th": "Migrations ผ่าน forward/rollback/idempotency tests", "text_en": "Migrations pass forward/rollback/idempotency tests" }
+        ]
+      },
+      {
+        "id": "test_suite",
+        "title": { "th": "Test Suite", "en": "Test Suite" },
+        "items": [
+          { "text_th": "pgTAP test files ครอบคลุม constraints, RLS policies, triggers, functions", "text_en": "pgTAP test files covering constraints, RLS, triggers, functions" },
+          { "text_th": "pgbench benchmark scripts สำหรับ hot paths จาก access_patterns", "text_en": "pgbench benchmark scripts for hot paths from access_patterns" },
+          { "text_th": "Tests runnable ใน CI ด้วย pg_prove", "text_en": "Tests runnable in CI via pg_prove" }
+        ]
+      },
+      {
+        "id": "operational_config",
+        "title": { "th": "Operational Configuration", "en": "Operational Configuration" },
+        "items": [
+          { "text_th": "pg_audit configuration (pgaudit.log scope, pgaudit.role)", "text_en": "pg_audit configuration (pgaudit.log scope and role)" },
+          { "text_th": "Autovacuum tuning parameters per table ใน postgresql.conf หรือ ALTER TABLE SET", "text_en": "Per-table autovacuum tuning parameters" },
+          { "text_th": "Monitoring queries (pg_stat_statements, pg_stat_activity) documented ใน RUNBOOK.md", "text_en": "Monitoring queries documented in RUNBOOK.md" },
+          { "text_th": "Backup automation config (pgBackRest.conf หรือ barman.conf)", "text_en": "Backup automation configuration (pgBackRest or barman)" }
+        ]
+      },
+      {
+        "id": "documentation_completeness",
+        "title": { "th": "Documentation Completeness", "en": "Documentation Completeness" },
+        "items": [
+          { "text_th": "ทุก 18 documents generated ใน docs/ ตาม meta.generation_order", "text_en": "All 18 documents generated in docs/ per meta.generation_order" },
+          { "text_th": "ทุก identifier ใน SCHEMA_SPEC.md derive จาก terms ใน GLOSSARY.md", "text_en": "Every identifier in SCHEMA_SPEC.md derives from GLOSSARY.md terms" },
+          { "text_th": "Cross-references ระหว่าง SCHEMA_SPEC.md, DATA_DICTIONARY.md, ERD.md, INDEXING_STRATEGY.md validated", "text_en": "Cross-references between SCHEMA_SPEC.md, DATA_DICTIONARY.md, ERD.md, INDEXING_STRATEGY.md validated" },
+          { "text_th": "ทุก table ใน SCHEMA_SPEC.md traceable ไปยัง entity ใน ERD.md และ fields ใน DATA_DICTIONARY.md", "text_en": "Every table in SCHEMA_SPEC.md traceable to ERD.md entity and DATA_DICTIONARY.md fields" }
+        ]
+      }
+    ],
+    "readiness_gates": [
+      {
+        "id": "schema_readiness",
+        "title": { "th": "Schema Readiness", "en": "Schema Readiness" },
+        "checklist": [
+          { "text_th": "ทุก entity ใน ERD.md มี complete DDL ใน SCHEMA_SPEC.md", "text_en": "Every entity in ERD.md has complete DDL in SCHEMA_SPEC.md", "refs": ["erd", "schema_spec"] },
+          { "text_th": "ทุก column ตรงกับ DATA_DICTIONARY.md type และ constraints", "text_en": "Every column matches DATA_DICTIONARY.md type and constraints", "refs": ["data_dictionary", "schema_spec"] },
+          { "text_th": "ทุก FK มี ON DELETE behavior ตาม ERD.md cardinality", "text_en": "Every FK has ON DELETE behavior matching ERD.md cardinality", "refs": ["erd", "schema_spec"] },
+          { "text_th": "ทุก CHECK constraint มี pgTAP test", "text_en": "Every CHECK constraint has a pgTAP test", "refs": ["schema_spec", "testing_strategy"] },
+          { "text_th": "Naming conventions จาก DATA_DICTIONARY.md enforced consistently", "text_en": "Naming conventions from DATA_DICTIONARY.md enforced consistently", "refs": ["data_dictionary"] }
+        ]
+      },
+      {
+        "id": "performance_readiness",
+        "title": { "th": "Performance Readiness", "en": "Performance Readiness" },
+        "checklist": [
+          { "text_th": "ทุก hot path ใน ACCESS_PATTERNS.md มี index ใน INDEXING_STRATEGY.md", "text_en": "Every hot path in ACCESS_PATTERNS.md has an index in INDEXING_STRATEGY.md", "refs": ["access_patterns", "indexing_strategy"] },
+          { "text_th": "EXPLAIN ANALYZE แสดง index scan (ไม่ใช่ seq scan) สำหรับ hot path queries", "text_en": "EXPLAIN ANALYZE shows index scan (not seq scan) for all hot path queries", "refs": ["indexing_strategy"] },
+          { "text_th": "Partitioned tables แสดง partition pruning ใน EXPLAIN output", "text_en": "Partitioned tables show partition pruning in EXPLAIN output", "refs": ["partitioning"] },
+          { "text_th": "pgbench benchmarks ผ่าน latency SLAs จาก ACCESS_PATTERNS.md", "text_en": "pgbench benchmarks meet latency SLAs from ACCESS_PATTERNS.md", "refs": ["access_patterns", "testing_strategy"] }
+        ]
+      },
+      {
+        "id": "security_readiness",
+        "title": { "th": "Security & Compliance Readiness", "en": "Security & Compliance Readiness" },
+        "checklist": [
+          { "text_th": "RLS enabled บน tables ทุกตัวที่มี multi-tenant หรือ sensitive data", "text_en": "RLS enabled on all tables containing multi-tenant or sensitive data", "refs": ["security"] },
+          { "text_th": "PDPA classification ครบทุก column ใน SCHEMA_SPEC.md", "text_en": "PDPA classification complete for every column in SCHEMA_SPEC.md", "refs": ["security", "data_dictionary"] },
+          { "text_th": "pg_audit configured และ logging DDL + DML บน sensitive tables", "text_en": "pg_audit configured and logging DDL + DML on sensitive tables", "refs": ["security"] },
+          { "text_th": "Role hierarchy follows least privilege — ไม่มี role ได้ superuser นอกจาก dba", "text_en": "Role hierarchy follows least privilege — no role has superuser except dba", "refs": ["security"] },
+          { "text_th": "ทุก Sensitive column มี encryption หรือ column-level REVOKE", "text_en": "Every Sensitive-classified column has encryption or column-level REVOKE", "refs": ["security"] },
+          { "text_th": "ทุก table ที่ถือ Personal/Sensitive data มี retention period และ erasure procedure ใน DATA_LIFECYCLE.md", "text_en": "Every table holding Personal/Sensitive data has a retention period and erasure procedure in DATA_LIFECYCLE.md", "refs": ["data_lifecycle", "security"] }
+        ]
+      },
+      {
+        "id": "operational_readiness",
+        "title": { "th": "Operational Readiness", "en": "Operational Readiness" },
+        "checklist": [
+          { "text_th": "PITR tested ด้วย recovery_target_time และ data verified", "text_en": "PITR tested with recovery_target_time and data verified", "refs": ["runbook"] },
+          { "text_th": "RPO/RTO verification drill completed และ documented", "text_en": "RPO/RTO verification drill completed and documented", "refs": ["runbook", "constraints"] },
+          { "text_th": "Autovacuum tuned per table และ monitoring active", "text_en": "Autovacuum tuned per table and monitoring active", "refs": ["runbook"] },
+          { "text_th": "Migration rollback tested สำหรับทุก migration type", "text_en": "Migration rollback tested for every migration type", "refs": ["migration_strategy"] },
+          { "text_th": "Purge jobs scheduled พร้อม monitoring alert ตาม DATA_LIFECYCLE.md", "text_en": "Purge jobs scheduled with monitoring alerts per DATA_LIFECYCLE.md", "refs": ["data_lifecycle", "runbook"] },
+          { "text_th": "RUNBOOK.md reviewed โดย DBA team", "text_en": "RUNBOOK.md reviewed by DBA team", "refs": ["runbook"] }
+        ]
+      },
+      {
+        "id": "documentation_readiness",
+        "title": { "th": "Documentation & Handoff Readiness", "en": "Documentation & Handoff Readiness" },
+        "checklist": [
+          { "text_th": "ทุก 18 documents complete และ cross-references validated", "text_en": "All 18 documents complete and cross-references validated", "refs": ["readme"] },
+          { "text_th": "GLOSSARY.md reviewed โดยทุก stakeholder role — disputed terms มีข้อยุติครบ", "text_en": "GLOSSARY.md reviewed by every stakeholder role — all disputed terms resolved", "refs": ["glossary"] },
+          { "text_th": "README.md verified — developer ใหม่ setup local PG และ run migrations ได้ภายใน 15 นาที", "text_en": "README.md verified — new developer can set up local PG and run migrations within 15 minutes", "refs": ["readme"] },
+          { "text_th": "CHANGELOG.md initialized ด้วย schema v1.0.0", "text_en": "CHANGELOG.md initialized with schema v1.0.0", "refs": ["changelog"] },
+          { "text_th": "Breaking change policy documented และ agreed upon", "text_en": "Breaking change policy documented and agreed upon", "refs": ["changelog", "migration_strategy"] }
+        ]
+      }
+    ]
+  }
+}

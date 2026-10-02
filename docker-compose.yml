@@ -1,0 +1,26 @@
+services:
+  app:
+    build: .
+    container_name: customer-request-app
+    ports:
+      - "8501:8501"
+    volumes:
+      - ./app:/app/app
+      - app-output:/app/output
+    # Load secrets/config from .env file (NOT baked into image)
+    env_file:
+      - .env
+    # Override or add specific vars at runtime if needed
+    environment:
+      - APP_REFERENCE_DATE=${APP_REFERENCE_DATE:-2026-10-02}
+    develop:
+      watch:
+        - action: sync
+          path: ./app
+          target: /app/app
+        - action: rebuild
+          path: requirements.txt
+
+volumes:
+  app-output:
+    driver: local

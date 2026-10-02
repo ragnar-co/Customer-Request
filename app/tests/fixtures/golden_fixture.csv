@@ -1,0 +1,7 @@
+request_id,request_type,request_title,owner,due_date,status
+REQ-001,assessment,Title A,Owner-01,2025-01-05,done
+REQ-002,assessment,Title B,Owner-02,2025-01-05,open
+REQ-003,report,Title C,Owner-03,2025-01-10,open
+REQ-004,report,Title D,Owner-04,2025-01-15,in_progress
+REQ-005,clarification,Title E,Owner-05,2024-12-20,in_progress
+REQ-006,clarification,Title F,Owner-01,2024-12-01,done

@@ -1,0 +1,3512 @@
+{
+  "$id": "ddd-data-analytics-v2.4.0.json",
+  "$schema": "./ddd-schema.json",
+  "meta": {
+    "id": "ddd-data-analytics",
+    "version": "2.4.0",
+    "title": "Data Analytics Documents",
+    "description": "DDD documentation framework for Data Analytics. AI reads this file and generates .md files covering KPI definition, metric logic, data pipelines, dashboards, and governance.",
+    "language": "th+en",
+    "output_dir": "docs/",
+    "generation_order": [
+      "stakeholders",
+      "kpi_dictionary",
+      "business_glossary",
+      "metric_spec",
+      "data_model_spec",
+      "metric_logic",
+      "data_contract",
+      "pipeline_spec",
+      "data_quality",
+      "sla_freshness",
+      "testing_strategy",
+      "viz_design_spec",
+      "dashboard_spec",
+      "report_spec",
+      "data_governance",
+      "lineage",
+      "ai_model_spec",
+      "runbook",
+      "analytics_changelog"
+    ],
+    "agent_instructions": {
+      "role": "You are a data analytics documentation generator. Read this file and produce each document listed in phases[], in dependency order.",
+      "generation_order_strategy": "Topological sort by depends_on graph. Business-layer documents (KPI, Metric Spec) have no dependencies and are generated first. Visualization design spec bridges stakeholders and metrics into dashboard standards. Governance and AI docs are generated last.",
+      "content_language": "Write document content in Thai for narrative sections; use English for all identifiers, SQL, field names, table names, and technical terms.",
+      "quality_gate": "Each document must cover all sections[] listed. Validate that cross-references (refs[]) resolve to real document IDs before finishing. Metric definitions must be consistent across KPI Dictionary, Metric Spec, and Metric Logic. For each dashboard chart, verify chart type matches viz_design_spec.chart_type_matrix. If advanced viz (crosshair, animation) is used, confirm stakeholder data_literacy_level >= intermediate."
+    }
+  },
+  "phases": [
+    {
+      "id": "phase_business",
+      "order": 1,
+      "title": {
+        "th": "Business Layer — Why & KPI",
+        "en": "Business Layer — Why & KPI"
+      },
+      "description": {
+        "th": "เป้าหมาย: สร้าง Single Source of Truth ของ KPI และ Metric ที่ทั้งองค์กรใช้ร่วมกัน",
+        "en": "Goal: Establish a Single Source of Truth for all KPIs and metrics shared across the organization."
+      },
+      "documents": [
+        {
+          "id": "stakeholders",
+          "filename": "STAKEHOLDERS.md",
+          "title": "Data Stakeholders",
+          "description": {
+            "th": "ระบุ data consumers ทุกกลุ่ม เช่น CEO, CSM, Finance, Ops พร้อม data needs, literacy level และ critical questions",
+            "en": "Identify all data consumers such as CEO, CSM, Finance, Ops with their data needs, literacy level, and critical questions."
+          },
+          "priority": "P1",
+          "depends_on": [],
+          "output_format": {
+            "type": "markdown",
+            "suggested_headings": [
+              "Stakeholder Profiles",
+              "Data Needs Matrix"
+            ]
+          },
+          "agent_hints": {
+            "instruction": "Generate a STAKEHOLDERS.md identifying every data consumer. For each stakeholder include: name/role, team, data literacy level (basic/intermediate/advanced), primary questions they need data to answer, current pain points with data access, preferred consumption format (dashboard/report/self-service query), and their critical decision cadence. Example stakeholders: CEO (weekly MRR review), CSM (daily at-risk customer list), Finance (monthly close revenue), Ops (daily pipeline health).",
+            "input_context": "This document drives dashboard and report design. Every stakeholder group mentioned in DASHBOARD_SPEC.md and REPORT_SPEC.md must be defined here first.",
+            "estimated_length": "500-800 words",
+            "validation": "Each stakeholder must have: name, role, team, data_literacy_level, critical_questions[], pain_points[], preferred_format, decision_cadence. All stakeholder groups referenced in dashboard_spec must be defined here."
+          },
+          "sections": [
+            {
+              "id": "stakeholder_profiles",
+              "heading": "Stakeholder Profiles",
+              "description": {
+                "th": "รายละเอียดของ data consumers แต่ละกลุ่ม",
+                "en": "Detailed profile for each data consumer group."
+              },
+              "refs": [],
+              "items": [
+                {
+                  "text_th": "Name / Role — ชื่อและ role ของ stakeholder เช่น CEO, CSM, Finance Manager",
+                  "text_en": "Name / Role — stakeholder name and role, e.g. CEO, CSM, Finance Manager"
+                },
+                {
+                  "text_th": "Data Literacy Level — basic, intermediate หรือ advanced",
+                  "text_en": "Data Literacy Level — basic, intermediate, or advanced"
+                },
+                {
+                  "text_th": "Critical Questions — คำถามสำคัญที่ต้องการ data ตอบ",
+                  "text_en": "Critical Questions — key questions this stakeholder needs data to answer"
+                },
+                {
+                  "text_th": "Current Pain Points — ปัญหาที่พบในการเข้าถึง/ใช้ data ปัจจุบัน",
+                  "text_en": "Current Pain Points — current frustrations with data access and quality"
+                },
+                {
+                  "text_th": "Preferred Format — รูปแบบการบริโภค data ที่ชอบ เช่น dashboard, email report",
+                  "text_en": "Preferred Format — preferred data consumption format, e.g. dashboard, email report"
+                },
+                {
+                  "text_th": "Decision Cadence — ตัดสินใจบ่อยแค่ไหนและต้องการ data ล่าสุดแค่ไหน",
+                  "text_en": "Decision Cadence — how often decisions are made and how fresh data must be"
+                }
+              ]
+            },
+            {
+              "id": "data_needs_matrix",
+              "heading": "Data Needs Matrix",
+              "description": {
+                "th": "ตาราง mapping ระหว่าง stakeholder กับ KPIs/metrics ที่ต้องการ",
+                "en": "Matrix mapping stakeholders to the KPIs and metrics they need."
+              },
+              "refs": [
+                "kpi_dictionary"
+              ],
+              "items": [
+                {
+                  "text_th": "Stakeholder × KPI matrix — KPI ไหนสำคัญต่อ stakeholder ไหน",
+                  "text_en": "Stakeholder × KPI matrix — which KPIs matter to which stakeholders"
+                },
+                {
+                  "text_th": "Priority level — P0 (cannot operate without), P1 (important), P2 (nice to have)",
+                  "text_en": "Priority level — P0 (cannot operate without), P1 (important), P2 (nice to have)"
+                },
+                {
+                  "text_th": "Freshness requirement — stakeholder แต่ละคนต้องการ data ที่อัพเดตบ่อยแค่ไหน",
+                  "text_en": "Freshness requirement — how fresh data must be for each stakeholder"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "kpi_dictionary",
+          "filename": "KPI_DICTIONARY.md",
+          "title": "KPI Dictionary",
+          "description": {
+            "th": "รวบรวม KPI ทุกตัวที่องค์กรใช้ พร้อม definition, owner, target และ business impact",
+            "en": "Catalog of all organizational KPIs with definition, owner, target, and business impact."
+          },
+          "priority": "P0",
+          "depends_on": [],
+          "output_format": {
+            "type": "markdown",
+            "suggested_headings": [
+              "KPI Catalog",
+              "KPI Hierarchy (CEO to Team Level)",
+              "Measurement Frequency",
+              "KPI Owners"
+            ]
+          },
+          "agent_hints": {
+            "instruction": "Generate a KPI_DICTIONARY.md that catalogs every KPI the organization tracks. For each KPI include: name, plain-language definition, business impact, owner (role or team), numeric target, measurement frequency (daily/weekly/monthly), and which OKR or iKPI it supports. Group KPIs by level: company-level (CEO), department-level, and team-level.",
+            "input_context": "Use business goals, OKR documentation, and stakeholder interviews as primary input. Common SaaS KPIs include NRR, GRR, CAC Payback, MRR, Churn Rate.",
+            "estimated_length": "600-1000 words",
+            "validation": "Each KPI must have: name, definition, owner, target (numeric), frequency, business_impact. Company-level and team-level KPIs must both be present."
+          },
+          "sections": [
+            {
+              "id": "kpi_catalog",
+              "heading": "KPI Catalog",
+              "description": {
+                "th": "รายการ KPI ทุกตัวพร้อม definition และ owner",
+                "en": "Complete list of all KPIs with definitions and owners."
+              },
+              "refs": [],
+              "items": [
+                {
+                  "text_th": "KPI Name และ plain-language definition",
+                  "text_en": "KPI name and plain-language definition"
+                },
+                {
+                  "text_th": "Owner — ทีมหรือ role ที่รับผิดชอบ KPI นี้",
+                  "text_en": "Owner — team or role responsible for this KPI"
+                },
+                {
+                  "text_th": "Target — ค่าเป้าหมายที่วัดได้เป็นตัวเลข",
+                  "text_en": "Target — numeric target value"
+                },
+                {
+                  "text_th": "Frequency — วัดผล daily, weekly หรือ monthly",
+                  "text_en": "Frequency — measurement cadence: daily, weekly, or monthly"
+                },
+                {
+                  "text_th": "Business Impact — ผลกระทบต่อธุรกิจถ้า KPI นี้ดีขึ้น/แย่ลง",
+                  "text_en": "Business Impact — what happens when this KPI improves or degrades"
+                },
+                {
+                  "text_th": "OKR / iKPI mapping — KPI นี้สนับสนุน objective อะไร",
+                  "text_en": "OKR / iKPI mapping — which objective this KPI supports"
+                }
+              ]
+            },
+            {
+              "id": "kpi_hierarchy",
+              "heading": "KPI Hierarchy (CEO to Team Level)",
+              "description": {
+                "th": "โครงสร้างลำดับชั้น KPI จาก company-level ลงถึง team-level",
+                "en": "Hierarchical structure of KPIs from company-level down to team-level."
+              },
+              "refs": [],
+              "items": [
+                {
+                  "text_th": "Company-level KPIs — KPI ระดับ CEO ที่สะท้อนสุขภาพธุรกิจโดยรวม",
+                  "text_en": "Company-level KPIs — CEO-level KPIs reflecting overall business health"
+                },
+                {
+                  "text_th": "Department-level KPIs — KPI ระดับแผนก เช่น Sales, CS, Finance, Product",
+                  "text_en": "Department-level KPIs — KPIs per department e.g. Sales, CS, Finance, Product"
+                },
+                {
+                  "text_th": "Team-level KPIs — KPI ระดับทีม ที่เป็น driver ของ department KPIs",
+                  "text_en": "Team-level KPIs — team-level drivers contributing to department KPIs"
+                },
+                {
+                  "text_th": "Parent-child mapping — แต่ละ KPI ระดับล่าง contribute ต่อ KPI ระดับบนอย่างไร",
+                  "text_en": "Parent-child mapping — how lower-level KPIs contribute to parent KPIs"
+                }
+              ]
+            },
+            {
+              "id": "measurement_frequency",
+              "heading": "Measurement Frequency",
+              "description": {
+                "th": "ความถี่ในการวัดผล KPI แต่ละตัว",
+                "en": "Measurement frequency for each KPI."
+              },
+              "refs": [],
+              "items": [
+                {
+                  "text_th": "Frequency — daily, weekly, monthly, quarterly",
+                  "text_en": "Frequency — daily, weekly, monthly, quarterly"
+                },
+                {
+                  "text_th": "Reporting Deadline — ต้อง report KPI ภายในกี่วันหลัง period close",
+                  "text_en": "Reporting Deadline — days after period close by which KPI must be reported"
+                },
+                {
+                  "text_th": "Data Availability — data พร้อมให้คำนวณ KPI เมื่อไหร่",
+                  "text_en": "Data Availability — when data is available for KPI calculation"
+                }
+              ]
+            },
+            {
+              "id": "kpi_owners",
+              "heading": "KPI Owners",
+              "description": {
+                "th": "รายชื่อ owner และ steward ของแต่ละ KPI พร้อม accountability",
+                "en": "KPI owners and stewards with clear accountability assignments."
+              },
+              "refs": [],
+              "items": [
+                {
+                  "text_th": "KPI Owner — role หรือทีมที่รับผิดชอบ target ของ KPI นี้",
+                  "text_en": "KPI Owner — role or team accountable for hitting the KPI target"
+                },
+                {
+                  "text_th": "Review Cadence — ประชุม review KPI นี้บ่อยแค่ไหน",
+                  "text_en": "Review Cadence — how often this KPI is reviewed in meetings"
+                },
+                {
+                  "text_th": "Escalation Path — ใครรับเรื่องเมื่อ KPI ต่ำกว่า threshold",
+                  "text_en": "Escalation Path — who is notified when KPI falls below threshold"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "business_glossary",
+          "filename": "BUSINESS_GLOSSARY.md",
+          "title": "Business Glossary",
+          "description": {
+            "th": "อธิบาย business terms ที่ใช้ในองค์กร เพื่อแก้ปัญหา 'คำเดียวกัน แต่คนเข้าใจไม่เหมือนกัน'",
+            "en": "Define business terms to eliminate ambiguity — same word, different understanding."
+          },
+          "priority": "P0",
+          "depends_on": [],
+          "output_format": {
+            "type": "markdown",
+            "suggested_headings": [
+              "Term Definitions",
+              "Disputed Terms",
+              "Change Log"
+            ]
+          },
+          "agent_hints": {
+            "instruction": "Generate a BUSINESS_GLOSSARY.md that defines all business terms used in data analysis and reporting. For each term include: the official definition, why it is commonly misunderstood, and the authoritative source. Pay special attention to terms like 'Active Customer', 'Churn', 'Revenue' (booked vs collected), 'MRR', and any org-specific terminology.",
+            "input_context": "Source terms from KPI definitions, metric names, and any known internal disputes about what a word means. This document reduces cross-team confusion.",
+            "estimated_length": "400-700 words",
+            "validation": "Each term must have: term, official_definition, common_misunderstanding, authoritative_source. Disputed terms section must address at least 3 commonly confused concepts."
+          },
+          "sections": [
+            {
+              "id": "term_definitions",
+              "heading": "Term Definitions",
+              "description": {
+                "th": "นิยามอย่างเป็นทางการของ business terms ทุกคำ",
+                "en": "Official definitions of all business terms."
+              },
+              "refs": [],
+              "items": [
+                {
+                  "text_th": "Term — คำศัพท์ที่ต้องการนิยาม",
+                  "text_en": "Term — the word or phrase being defined"
+                },
+                {
+                  "text_th": "Official Definition — นิยามอย่างเป็นทางการที่ทุกทีมต้องใช้",
+                  "text_en": "Official Definition — the canonical meaning all teams must use"
+                },
+                {
+                  "text_th": "Common Misunderstanding — ความเข้าใจที่มักผิดพลาด",
+                  "text_en": "Common Misunderstanding — how this term is commonly misinterpreted"
+                },
+                {
+                  "text_th": "Authoritative Source — แหล่งที่มาของ definition นี้",
+                  "text_en": "Authoritative Source — where this definition comes from"
+                },
+                {
+                  "text_th": "ตัวอย่างที่มักสร้างความสับสน เช่น Churn = cancel หรือ unpaid?",
+                  "text_en": "Ambiguous examples, e.g. Churn = cancel or unpaid?"
+                }
+              ]
+            },
+            {
+              "id": "disputed_terms",
+              "heading": "Disputed Terms",
+              "description": {
+                "th": "คำที่ทีมต่างๆ มีความเข้าใจต่างกัน พร้อม resolution อย่างเป็นทางการ",
+                "en": "Terms with cross-team disagreements and their official resolutions."
+              },
+              "refs": [],
+              "items": [
+                {
+                  "text_th": "Disputed Term — คำที่มีการตีความต่างกันระหว่างทีม",
+                  "text_en": "Disputed Term — term interpreted differently across teams"
+                },
+                {
+                  "text_th": "Competing Definitions — แต่ละทีมเข้าใจอย่างไร",
+                  "text_en": "Competing Definitions — how each team currently interprets the term"
+                },
+                {
+                  "text_th": "Official Resolution — นิยามที่ตกลงใช้ร่วมกันแล้ว พร้อมวันที่ approved",
+                  "text_en": "Official Resolution — agreed definition with approval date"
+                },
+                {
+                  "text_th": "Decision Owner — ใครเป็นผู้ตัดสินใจ resolution นี้",
+                  "text_en": "Decision Owner — who made the final call on this resolution"
+                }
+              ]
+            },
+            {
+              "id": "glossary_changelog",
+              "heading": "Change Log",
+              "description": {
+                "th": "ประวัติการเปลี่ยนแปลง definition ของ terms ต่างๆ",
+                "en": "History of definition changes for tracked terms."
+              },
+              "refs": [],
+              "items": [
+                {
+                  "text_th": "Term ที่เปลี่ยน — ชื่อคำที่มีการแก้ไข definition",
+                  "text_en": "Changed Term — term whose definition was updated"
+                },
+                {
+                  "text_th": "วันที่เปลี่ยน — วันที่ definition ใหม่มีผลบังคับใช้",
+                  "text_en": "Change Date — date the new definition took effect"
+                },
+                {
+                  "text_th": "Old Definition vs New Definition — เปรียบเทียบก่อน/หลัง",
+                  "text_en": "Old vs New Definition — before and after comparison"
+                },
+                {
+                  "text_th": "Reason — เหตุผลที่ต้องเปลี่ยน definition",
+                  "text_en": "Reason — why the definition was changed"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "metric_spec",
+          "filename": "METRIC_SPEC.md",
+          "title": "Metric Specification",
+          "description": {
+            "th": "Single Source of Truth ของ Metric แต่ละตัว รวม definition, formula, grain, filters และ action threshold",
+            "en": "Single Source of Truth for every metric: definition, formula, grain, filters, and action threshold."
+          },
+          "priority": "P0",
+          "depends_on": [
+            "kpi_dictionary",
+            "business_glossary",
+            "stakeholders"
+          ],
+          "output_format": {
+            "type": "markdown",
+            "suggested_headings": [
+              "Metric Profiles",
+              "Formula Reference",
+              "Grain and Filter Matrix",
+              "Action Thresholds"
+            ]
+          },
+          "agent_hints": {
+            "instruction": "Generate a METRIC_SPEC.md as the single source of truth for every metric. For each metric include: name, business definition, formula (plain language and mathematical notation), grain (unit of measurement), required filters, data owner, refresh cadence, and the action threshold (the value at which someone must act). Reference KPI_DICTIONARY.md for each metric's parent KPI.",
+            "input_context": "Depends on kpi_dictionary. Every metric must map to a KPI in KPI_DICTIONARY.md. This is the heart of the DDD framework — all downstream documents derive metric definitions from here.",
+            "estimated_length": "700-1200 words",
+            "validation": "Each metric must have: name, definition, formula, grain, filters[], owner, refresh_cadence, action_threshold, parent_kpi (referencing kpi_dictionary). No metric may exist without a parent KPI."
+          },
+          "sections": [
+            {
+              "id": "metric_profiles",
+              "heading": "Metric Profiles",
+              "description": {
+                "th": "รายละเอียดครบของ Metric แต่ละตัว",
+                "en": "Complete profile for each metric."
+              },
+              "refs": [
+                "kpi_dictionary",
+                "business_glossary"
+              ],
+              "items": [
+                {
+                  "text_th": "Metric Name และ business definition ที่ชัดเจน",
+                  "text_en": "Metric name and clear business definition"
+                },
+                {
+                  "text_th": "Parent KPI — KPI ที่ metric นี้เป็น driver (อ้างอิง kpi_dictionary)",
+                  "text_en": "Parent KPI — the KPI this metric drives (referencing kpi_dictionary)"
+                },
+                {
+                  "text_th": "Owner — ทีมที่รับผิดชอบ metric นี้",
+                  "text_en": "Owner — team responsible for this metric"
+                },
+                {
+                  "text_th": "Refresh Cadence — อัพเดตข้อมูลบ่อยแค่ไหน",
+                  "text_en": "Refresh Cadence — how often data is updated"
+                }
+              ]
+            },
+            {
+              "id": "formula_reference",
+              "heading": "Formula Reference",
+              "description": {
+                "th": "สูตรคำนวณของ metric แต่ละตัว ทั้ง plain language และ mathematical notation",
+                "en": "Calculation formulas for every metric in plain language and mathematical notation."
+              },
+              "refs": [
+                "kpi_dictionary",
+                "business_glossary"
+              ],
+              "items": [
+                {
+                  "text_th": "Formula (plain language) — อธิบายวิธีคำนวณเป็นภาษาธรรมดา",
+                  "text_en": "Formula (plain language) — plain-language description of calculation"
+                },
+                {
+                  "text_th": "Formula (notation) — สูตรคณิตศาสตร์หรือ pseudocode",
+                  "text_en": "Formula (notation) — mathematical notation or pseudocode"
+                },
+                {
+                  "text_th": "Numerator definition — ตัวเศษในสูตร พร้อมเงื่อนไข",
+                  "text_en": "Numerator definition — numerator with conditions"
+                },
+                {
+                  "text_th": "Denominator definition — ตัวส่วนในสูตร พร้อมเงื่อนไข",
+                  "text_en": "Denominator definition — denominator with conditions"
+                }
+              ]
+            },
+            {
+              "id": "grain_filter_matrix",
+              "heading": "Grain and Filter Matrix",
+              "description": {
+                "th": "ตาราง grain และ filter ของแต่ละ metric",
+                "en": "Matrix of grain and filter combinations per metric."
+              },
+              "refs": [
+                "kpi_dictionary"
+              ],
+              "items": [
+                {
+                  "text_th": "Grain — หน่วยของการวัด เช่น per customer per month",
+                  "text_en": "Grain — unit of measurement, e.g. per customer per month"
+                },
+                {
+                  "text_th": "Required Filters — เงื่อนไขที่ต้องกรองก่อนคำนวณเสมอ",
+                  "text_en": "Required Filters — mandatory conditions applied before calculation"
+                },
+                {
+                  "text_th": "Optional Filters — filter ที่ user เลือกใช้ได้ใน dashboard",
+                  "text_en": "Optional Filters — user-selectable filters available in dashboards"
+                },
+                {
+                  "text_th": "Segment Breakdowns — dimension ที่ metric นี้รองรับการ slice เช่น by plan, by region",
+                  "text_en": "Segment Breakdowns — dimensions this metric can be sliced by, e.g. by plan, by region"
+                }
+              ]
+            },
+            {
+              "id": "action_thresholds",
+              "heading": "Action Thresholds",
+              "description": {
+                "th": "ค่า threshold ที่ trigger การดำเนินการสำหรับแต่ละ metric",
+                "en": "Threshold values that trigger required actions per metric."
+              },
+              "refs": [
+                "kpi_dictionary"
+              ],
+              "items": [
+                {
+                  "text_th": "Warning Threshold — ค่าที่เริ่มต้องระวัง (yellow alert)",
+                  "text_en": "Warning Threshold — value triggering a caution alert (yellow)"
+                },
+                {
+                  "text_th": "Critical Threshold — ค่าที่ต้องดำเนินการทันที (red alert)",
+                  "text_en": "Critical Threshold — value requiring immediate action (red)"
+                },
+                {
+                  "text_th": "Required Action — สิ่งที่ต้องทำเมื่อถึง threshold",
+                  "text_en": "Required Action — what must be done when threshold is breached"
+                },
+                {
+                  "text_th": "Responsible Team — ทีมที่รับผิดชอบเมื่อ metric ถึง threshold",
+                  "text_en": "Responsible Team — team accountable when metric hits threshold"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "phase_analytics",
+      "order": 2,
+      "title": {
+        "th": "Analytics Layer — How We Compute",
+        "en": "Analytics Layer — How We Compute"
+      },
+      "description": {
+        "th": "เป้าหมาย: กำหนด semantic layer, SQL logic และ data contract ให้ชัดเจน",
+        "en": "Goal: Define the semantic layer, SQL transformation logic, and data contracts."
+      },
+      "documents": [
+        {
+          "id": "data_model_spec",
+          "filename": "DATA_MODEL_SPEC.md",
+          "title": "Data Model Spec (Semantic Layer)",
+          "description": {
+            "th": "อธิบาย structure ของ data: fact tables, dimension tables, relationship และ grain definition",
+            "en": "Describe data structure: fact tables, dimension tables, relationships, and grain definitions."
+          },
+          "priority": "P0",
+          "depends_on": [
+            "metric_spec"
+          ],
+          "output_format": {
+            "type": "markdown",
+            "suggested_headings": [
+              "Fact Tables",
+              "Dimension Tables",
+              "Relationships",
+              "Grain Definitions",
+              "PDPA Data Classification"
+            ]
+          },
+          "agent_hints": {
+            "instruction": "Generate a DATA_MODEL_SPEC.md documenting the semantic layer. List all fact tables (e.g. fact_mrr_monthly, fact_usage_daily) and dimension tables (e.g. dim_customer, dim_product). For each table include: name, grain, key columns, description, and source system. Draw relationships between tables using Mermaid ERD. Classify each column containing customer data as Personal Data (PDPA).",
+            "input_context": "Every metric in METRIC_SPEC.md must be traceable to at least one fact table. Grain defined in METRIC_SPEC.md must match the grain of the corresponding fact table.",
+            "estimated_length": "700-1200 words",
+            "validation": "Every fact table must have a defined grain. Every dimension table must have a primary key. All columns storing customer/personal data must have PDPA classification. Every metric in METRIC_SPEC.md must map to at least one table."
+          },
+          "sections": [
+            {
+              "id": "fact_tables",
+              "heading": "Fact Tables",
+              "description": {
+                "th": "รายการ fact tables ทั้งหมดพร้อม grain definition",
+                "en": "All fact tables with their grain definitions."
+              },
+              "refs": [
+                "metric_spec"
+              ],
+              "items": [
+                {
+                  "text_th": "Table Name — ชื่อ fact table เช่น fact_mrr_monthly, fact_usage_daily",
+                  "text_en": "Table Name — fact table name, e.g. fact_mrr_monthly, fact_usage_daily"
+                },
+                {
+                  "text_th": "Grain — หน่วยของ 1 row เช่น per customer per month",
+                  "text_en": "Grain — what one row represents, e.g. per customer per month"
+                },
+                {
+                  "text_th": "Key Columns — primary key และ business key columns",
+                  "text_en": "Key Columns — primary key and business key columns"
+                },
+                {
+                  "text_th": "Source System — ข้อมูลมาจากระบบไหน",
+                  "text_en": "Source System — which system the data originates from"
+                }
+              ]
+            },
+            {
+              "id": "dimension_tables",
+              "heading": "Dimension Tables",
+              "description": {
+                "th": "รายการ dimension tables ทั้งหมดพร้อม primary key",
+                "en": "All dimension tables with their primary keys."
+              },
+              "refs": [
+                "metric_spec"
+              ],
+              "items": [
+                {
+                  "text_th": "Table Name — ชื่อ dimension table เช่น dim_customer, dim_product",
+                  "text_en": "Table Name — dimension table name, e.g. dim_customer, dim_product"
+                },
+                {
+                  "text_th": "Primary Key — column ที่เป็น PK",
+                  "text_en": "Primary Key — PK column"
+                },
+                {
+                  "text_th": "SCD Type — Slowly Changing Dimension type (1, 2, or none)",
+                  "text_en": "SCD Type — Slowly Changing Dimension type (1, 2, or none)"
+                },
+                {
+                  "text_th": "Key Attributes — attributes สำคัญที่ใช้ segment/filter data",
+                  "text_en": "Key Attributes — important attributes used for segmenting/filtering data"
+                }
+              ]
+            },
+            {
+              "id": "relationships",
+              "heading": "Relationships",
+              "description": {
+                "th": "ERD แสดง join key ระหว่าง tables",
+                "en": "ERD showing join keys between tables."
+              },
+              "refs": [
+                "metric_spec"
+              ],
+              "items": [
+                {
+                  "text_th": "ERD Diagram — Mermaid ERD แสดง relationships ระหว่าง fact/dimension tables",
+                  "text_en": "ERD Diagram — Mermaid ERD showing fact/dimension table relationships"
+                },
+                {
+                  "text_th": "Join Keys — FK columns ที่ใช้ join ระหว่าง tables",
+                  "text_en": "Join Keys — FK columns used for joins between tables"
+                },
+                {
+                  "text_th": "Cardinality — 1:1, 1:N, N:M relationship types",
+                  "text_en": "Cardinality — 1:1, 1:N, N:M relationship types"
+                }
+              ]
+            },
+            {
+              "id": "grain_definitions",
+              "heading": "Grain Definitions",
+              "description": {
+                "th": "นิยาม grain ของแต่ละ table — row 1 แถวคืออะไร",
+                "en": "Grain definition per table — what one row represents."
+              },
+              "refs": [
+                "metric_spec"
+              ],
+              "items": [
+                {
+                  "text_th": "Table × Grain Matrix — ตาราง grain ของทุก fact table",
+                  "text_en": "Table × Grain Matrix — grain per fact table"
+                },
+                {
+                  "text_th": "Grain Consistency — grain ต้องตรงกับ metric grain ใน METRIC_SPEC.md",
+                  "text_en": "Grain Consistency — grain must match metric grain in METRIC_SPEC.md"
+                },
+                {
+                  "text_th": "Aggregation Rules — วิธี aggregate จาก fine grain ไป coarse grain",
+                  "text_en": "Aggregation Rules — how to aggregate from fine to coarse grain"
+                }
+              ]
+            },
+            {
+              "id": "pdpa_data_classification",
+              "heading": "PDPA Data Classification",
+              "description": {
+                "th": "จำแนก columns ที่เป็น Personal Data ตาม PDPA",
+                "en": "Classify columns containing Personal Data per PDPA."
+              },
+              "refs": [
+                "metric_spec"
+              ],
+              "items": [
+                {
+                  "text_th": "PII Columns — ระบุทุก column ที่มี customer/personal data",
+                  "text_en": "PII Columns — identify every column containing customer/personal data"
+                },
+                {
+                  "text_th": "Classification Level — public, internal, confidential, restricted",
+                  "text_en": "Classification Level — public, internal, confidential, restricted"
+                },
+                {
+                  "text_th": "Handling Rules — masking, encryption, access restrictions per level",
+                  "text_en": "Handling Rules — masking, encryption, access restrictions per level"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "metric_logic",
+          "filename": "METRIC_LOGIC.md",
+          "title": "Metric Logic Spec (SQL)",
+          "description": {
+            "th": "mapping จาก Metric Spec → SQL จริง รวม source tables, join logic และ edge cases",
+            "en": "Mapping from Metric Spec to actual SQL: source tables, join logic, and edge cases."
+          },
+          "priority": "P0",
+          "depends_on": [
+            "metric_spec",
+            "data_model_spec"
+          ],
+          "output_format": {
+            "type": "markdown",
+            "suggested_headings": [
+              "Metric SQL Implementations",
+              "Edge Case Handling",
+              "Transformation Dependencies"
+            ]
+          },
+          "agent_hints": {
+            "instruction": "Generate a METRIC_LOGIC.md that maps every metric from METRIC_SPEC.md to its SQL implementation. For each metric include: the SQL query (or dbt model reference), source tables used, join conditions, WHERE filters, GROUP BY grain, and explicit handling of edge cases (e.g. proration, mid-month churn, null handling, currency conversion). Document transformation dependencies as a DAG.",
+            "input_context": "Every metric in METRIC_SPEC.md must have a corresponding SQL implementation here. Table references must match DATA_MODEL_SPEC.md exactly.",
+            "estimated_length": "700-1200 words",
+            "validation": "Every metric from METRIC_SPEC.md must have a SQL implementation. Each implementation must document: source_tables[], join_logic, filters, edge_cases[]. Edge cases for churn and proration must be explicitly handled."
+          },
+          "sections": [
+            {
+              "id": "sql_implementations",
+              "heading": "Metric SQL Implementations",
+              "description": {
+                "th": "SQL logic สำหรับแต่ละ metric พร้อม source tables และ join conditions",
+                "en": "SQL logic for each metric with source tables and join conditions."
+              },
+              "refs": [
+                "metric_spec",
+                "data_model_spec"
+              ],
+              "items": [
+                {
+                  "text_th": "SQL Query หรือ dbt model reference ของแต่ละ metric",
+                  "text_en": "SQL query or dbt model reference for each metric"
+                },
+                {
+                  "text_th": "Source Tables — tables ที่ query นี้ดึงข้อมูล",
+                  "text_en": "Source Tables — tables queried by this implementation"
+                },
+                {
+                  "text_th": "Join Logic — เงื่อนไข join ระหว่าง tables",
+                  "text_en": "Join Logic — join conditions between tables"
+                },
+                {
+                  "text_th": "WHERE Filters — เงื่อนไง filter ที่ใช้ใน query",
+                  "text_en": "WHERE Filters — filter conditions applied in the query"
+                },
+                {
+                  "text_th": "GROUP BY Grain — ระดับ aggregation ที่ตรงกับ metric grain",
+                  "text_en": "GROUP BY Grain — aggregation level matching the metric grain"
+                }
+              ]
+            },
+            {
+              "id": "edge_case_handling",
+              "heading": "Edge Case Handling",
+              "description": {
+                "th": "วิธี handle กรณีพิเศษที่ทำให้ metric calculation ผิดพลาดได้",
+                "en": "Handling of special cases that can cause metric calculation errors."
+              },
+              "refs": [
+                "metric_spec",
+                "data_model_spec"
+              ],
+              "items": [
+                {
+                  "text_th": "Mid-month Churn — วิธี handle customer ที่ churn กลางเดือน",
+                  "text_en": "Mid-month Churn — how to handle customers churning mid-month"
+                },
+                {
+                  "text_th": "Proration — วิธีคำนวณ MRR เมื่อ plan เปลี่ยนกลางงวด",
+                  "text_en": "Proration — how to calculate MRR when plan changes mid-period"
+                },
+                {
+                  "text_th": "Null / Missing Values — วิธี handle null ใน fields สำคัญ",
+                  "text_en": "Null / Missing Values — how null values in key fields are handled"
+                },
+                {
+                  "text_th": "Currency Conversion — วิธี normalize สกุลเงินต่างกัน",
+                  "text_en": "Currency Conversion — how different currencies are normalized"
+                },
+                {
+                  "text_th": "Backdated Records — วิธี handle records ที่ insert หลัง period close",
+                  "text_en": "Backdated Records — how records inserted after period close are handled"
+                }
+              ]
+            },
+            {
+              "id": "transformation_dependencies",
+              "heading": "Transformation Dependencies",
+              "description": {
+                "th": "DAG แสดง dependency ระหว่าง transformation models",
+                "en": "DAG showing dependencies between transformation models."
+              },
+              "refs": [
+                "metric_spec",
+                "data_model_spec"
+              ],
+              "items": [
+                {
+                  "text_th": "Model DAG — Mermaid diagram แสดง upstream/downstream dependencies",
+                  "text_en": "Model DAG — Mermaid diagram of upstream and downstream dependencies"
+                },
+                {
+                  "text_th": "Staging Models — raw source tables → cleaned staging models",
+                  "text_en": "Staging Models — raw source to cleaned staging model transformations"
+                },
+                {
+                  "text_th": "Intermediate Models — staging → business logic models",
+                  "text_en": "Intermediate Models — staging to business logic model transformations"
+                },
+                {
+                  "text_th": "Mart Models — intermediate → final metric tables",
+                  "text_en": "Mart Models — intermediate to final metric table transformations"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "data_contract",
+          "filename": "DATA_CONTRACT.md",
+          "title": "Data Contract",
+          "description": {
+            "th": "ข้อตกลงระหว่าง Product และ Data team เรื่อง schema, required fields, data type และ SLA",
+            "en": "Agreement between Product and Data teams on schema, required fields, data types, and SLA."
+          },
+          "priority": "P1",
+          "depends_on": [
+            "data_model_spec"
+          ],
+          "output_format": {
+            "type": "markdown",
+            "suggested_headings": [
+              "Contract Overview",
+              "Schema Definitions",
+              "SLA Commitments",
+              "Breaking Change Policy",
+              "Required Fields",
+              "Data Type Constraints"
+            ]
+          },
+          "agent_hints": {
+            "instruction": "Generate a DATA_CONTRACT.md defining the interface contract between the Product team (data producers) and the Data team (data consumers). For each event or table in the contract include: schema definition, required vs optional fields, data types, allowed values, and the SLA (latency and availability). Define a breaking change policy including versioning and migration notice period.",
+            "input_context": "Depends on data_model_spec for table and field definitions. Critical for AI automation — any downstream pipeline or model depends on this contract being stable.",
+            "estimated_length": "500-900 words",
+            "validation": "Every table/event in the contract must have: schema[], required_fields[], data_types[], sla (latency + availability). Breaking change policy must specify notice period and migration procedure."
+          },
+          "sections": [
+            {
+              "id": "contract_definitions",
+              "heading": "Contract Overview",
+              "description": {
+                "th": "ข้อตกลงระหว่าง system เรื่อง scope และ parties",
+                "en": "Contract scope and participating parties."
+              },
+              "refs": [
+                "data_model_spec"
+              ],
+              "items": [
+                {
+                  "text_th": "Contract Parties — Producer (ใครสร้าง data) และ Consumer (ใครใช้ data)",
+                  "text_en": "Contract Parties — Producer (who creates data) and Consumer (who uses data)"
+                },
+                {
+                  "text_th": "Contract Scope — tables และ events ที่อยู่ภายใต้ contract นี้",
+                  "text_en": "Contract Scope — tables and events covered by this contract"
+                },
+                {
+                  "text_th": "Contract Version — version ของ contract นี้ และวันที่ effective",
+                  "text_en": "Contract Version — contract version and effective date"
+                }
+              ]
+            },
+            {
+              "id": "schema_definitions",
+              "heading": "Schema Definitions",
+              "description": {
+                "th": "โครงสร้าง schema ของแต่ละ table/event ใน contract",
+                "en": "Schema structure for each table or event in the contract."
+              },
+              "refs": [
+                "data_model_spec"
+              ],
+              "items": [
+                {
+                  "text_th": "Field Name — ชื่อ field ที่ตกลงกัน (snake_case)",
+                  "text_en": "Field Name — agreed field name (snake_case)"
+                },
+                {
+                  "text_th": "Data Type — ประเภทข้อมูล เช่น STRING, INTEGER, TIMESTAMP",
+                  "text_en": "Data Type — data type, e.g. STRING, INTEGER, TIMESTAMP"
+                },
+                {
+                  "text_th": "Allowed Values — ค่าที่ valid เช่น enum values หรือ value range",
+                  "text_en": "Allowed Values — valid values, e.g. enum values or value range"
+                },
+                {
+                  "text_th": "Nullable — field นี้ null ได้หรือไม่",
+                  "text_en": "Nullable — whether this field can be null"
+                }
+              ]
+            },
+            {
+              "id": "sla_commitments",
+              "heading": "SLA Commitments",
+              "description": {
+                "th": "SLA ที่ producer รับประกันต่อ consumer",
+                "en": "SLA guarantees the producer commits to the consumer."
+              },
+              "refs": [
+                "data_model_spec"
+              ],
+              "items": [
+                {
+                  "text_th": "Latency SLA — ข้อมูลต้องพร้อมใช้ภายในกี่ชั่วโมงหลัง event เกิด",
+                  "text_en": "Latency SLA — data must be available within X hours of the event"
+                },
+                {
+                  "text_th": "Availability SLA — uptime ที่รับประกัน เช่น 99.5%",
+                  "text_en": "Availability SLA — guaranteed uptime, e.g. 99.5%"
+                },
+                {
+                  "text_th": "Completeness SLA — % rows ที่ต้องครบ ไม่มี missing data",
+                  "text_en": "Completeness SLA — % of rows that must be present, no missing data"
+                }
+              ]
+            },
+            {
+              "id": "breaking_change_policy",
+              "heading": "Breaking Change Policy",
+              "description": {
+                "th": "นโยบายสำหรับการเปลี่ยนแปลง schema ที่กระทบ consumer",
+                "en": "Policy for schema changes that impact consumers."
+              },
+              "refs": [
+                "data_model_spec"
+              ],
+              "items": [
+                {
+                  "text_th": "Breaking Change Definition — อะไรถือว่าเป็น breaking change เช่น rename field, drop column",
+                  "text_en": "Breaking Change Definition — what constitutes a breaking change, e.g. rename field, drop column"
+                },
+                {
+                  "text_th": "Notice Period — ต้องแจ้งล่วงหน้ากี่วัน (minimum 14 days)",
+                  "text_en": "Notice Period — minimum advance notice required (e.g. 14 days)"
+                },
+                {
+                  "text_th": "Migration Procedure — วิธีที่ consumer ต้อง migrate พร้อม deadline",
+                  "text_en": "Migration Procedure — how consumers must migrate with deadline"
+                },
+                {
+                  "text_th": "Versioning Strategy — วิธีทำ version เช่น v1/v2 namespaces",
+                  "text_en": "Versioning Strategy — how versions are managed, e.g. v1/v2 namespaces"
+                }
+              ]
+            },
+            {
+              "id": "required_fields",
+              "heading": "Required Fields",
+              "description": {
+                "th": "Fields ที่ต้องมีในทุก record (non-nullable)",
+                "en": "Fields that must be present in every record (non-nullable)."
+              },
+              "refs": [
+                "data_model_spec"
+              ],
+              "items": [
+                {
+                  "text_th": "Required Fields per Table — list ของ fields ที่ null ไม่ได้",
+                  "text_en": "Required Fields per Table — list of non-nullable fields"
+                },
+                {
+                  "text_th": "Default Values — ค่า default เมื่อ field ไม่ได้ส่งมา",
+                  "text_en": "Default Values — default values when field is not provided"
+                },
+                {
+                  "text_th": "Validation Rules — rules สำหรับตรวจ required fields ก่อน ingestion",
+                  "text_en": "Validation Rules — rules for checking required fields before ingestion"
+                }
+              ]
+            },
+            {
+              "id": "data_type_constraints",
+              "heading": "Data Type Constraints",
+              "description": {
+                "th": "ข้อจำกัดด้าน data types ที่ producer ต้องปฏิบัติตาม",
+                "en": "Data type constraints the producer must follow."
+              },
+              "refs": [
+                "data_model_spec"
+              ],
+              "items": [
+                {
+                  "text_th": "Type Mapping — mapping จาก source data types ไป warehouse types",
+                  "text_en": "Type Mapping — mapping from source data types to warehouse types"
+                },
+                {
+                  "text_th": "Precision Rules — ความแม่นยำของ numeric fields เช่น DECIMAL(18,4)",
+                  "text_en": "Precision Rules — numeric field precision, e.g. DECIMAL(18,4)"
+                },
+                {
+                  "text_th": "String Constraints — max length, encoding (UTF-8), allowed characters",
+                  "text_en": "String Constraints — max length, encoding (UTF-8), allowed characters"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "phase_engineering",
+      "order": 3,
+      "title": {
+        "th": "Data Engineering Layer — Pipeline",
+        "en": "Data Engineering Layer — Pipeline"
+      },
+      "description": {
+        "th": "เป้าหมาย: Document pipeline architecture, quality rules และ SLA เพื่อให้ data ที่ส่งไป dashboard trustworthy",
+        "en": "Goal: Document pipeline architecture, quality rules, and SLA to ensure dashboards receive trustworthy data."
+      },
+      "documents": [
+        {
+          "id": "pipeline_spec",
+          "filename": "PIPELINE_SPEC.md",
+          "title": "Data Pipeline Spec",
+          "description": {
+            "th": "Source → Transform → Destination pipeline พร้อม tools, schedule และ dependency",
+            "en": "Source → Transform → Destination pipeline with tools, schedule, and dependencies."
+          },
+          "priority": "P0",
+          "depends_on": [
+            "data_model_spec",
+            "metric_logic"
+          ],
+          "output_format": {
+            "type": "markdown",
+            "suggested_headings": [
+              "Pipeline Overview",
+              "Pipeline Definitions",
+              "Source Systems",
+              "Error Handling and Retry",
+              "Credentials & Secret Management"
+            ]
+          },
+          "agent_hints": {
+            "instruction": "Generate a PIPELINE_SPEC.md documenting every data pipeline. For each pipeline include: source system (database, API, webhook), transformation steps with tool (dbt, Make, GCP Dataflow, etc.), destination (data warehouse, dashboard), schedule (cron expression), upstream dependencies, and error handling / retry policy. Draw the pipeline DAG using Mermaid.",
+            "input_context": "Pipelines must produce all tables defined in DATA_MODEL_SPEC.md. Transformation logic must implement SQL from METRIC_LOGIC.md.",
+            "estimated_length": "600-1000 words",
+            "validation": "Every table in DATA_MODEL_SPEC.md must have a pipeline that populates it. Each pipeline must have: source, transform_tool, destination, schedule (cron), dependencies[], error_handling."
+          },
+          "sections": [
+            {
+              "id": "pipeline_overview",
+              "heading": "Pipeline Overview",
+              "description": {
+                "th": "ภาพรวมของทุก pipeline ใน analytics stack",
+                "en": "High-level overview of all pipelines in the analytics stack."
+              },
+              "refs": [
+                "data_model_spec",
+                "metric_logic"
+              ],
+              "items": [
+                {
+                  "text_th": "Pipeline Inventory — รายชื่อ pipelines ทั้งหมดพร้อม purpose",
+                  "text_en": "Pipeline Inventory — list of all pipelines with their purpose"
+                },
+                {
+                  "text_th": "Pipeline DAG — Mermaid diagram แสดง dependency ระหว่าง pipelines",
+                  "text_en": "Pipeline DAG — Mermaid diagram showing pipeline dependencies"
+                },
+                {
+                  "text_th": "Technology Stack — เครื่องมือที่ใช้ เช่น dbt, Make, Fivetran, GCP Dataflow",
+                  "text_en": "Technology Stack — tools used, e.g. dbt, Make, Fivetran, GCP Dataflow"
+                }
+              ]
+            },
+            {
+              "id": "pipeline_definitions",
+              "heading": "Pipeline Definitions",
+              "description": {
+                "th": "รายละเอียด Source → Transform → Destination ของทุก pipeline",
+                "en": "Source-to-destination details for every pipeline."
+              },
+              "refs": [
+                "data_model_spec",
+                "metric_logic"
+              ],
+              "items": [
+                {
+                  "text_th": "Pipeline Name และ purpose",
+                  "text_en": "Pipeline name and purpose"
+                },
+                {
+                  "text_th": "Transformation Steps — เครื่องมือและ logic เช่น dbt, Make, GCP Dataflow",
+                  "text_en": "Transformation Steps — tools and logic, e.g. dbt, Make, GCP Dataflow"
+                },
+                {
+                  "text_th": "Schedule — cron expression ของแต่ละ pipeline",
+                  "text_en": "Schedule — cron expression for each pipeline"
+                },
+                {
+                  "text_th": "Dependencies — pipelines อื่นที่ต้องเสร็จก่อน",
+                  "text_en": "Dependencies — upstream pipelines that must complete first"
+                }
+              ]
+            },
+            {
+              "id": "source_systems",
+              "heading": "Source Systems",
+              "description": {
+                "th": "รายละเอียดของ source systems ทุกตัวที่ pipeline ดึงข้อมูล",
+                "en": "Details of every source system pipelines extract from."
+              },
+              "refs": [
+                "data_model_spec"
+              ],
+              "items": [
+                {
+                  "text_th": "Source System Name — ชื่อ system เช่น Zoho CRM, Product DB, Stripe",
+                  "text_en": "Source System Name — system name, e.g. Zoho CRM, Product DB, Stripe"
+                },
+                {
+                  "text_th": "Extraction Method — วิธีดึงข้อมูล เช่น API pull, CDC, webhook push",
+                  "text_en": "Extraction Method — how data is extracted, e.g. API pull, CDC, webhook push"
+                },
+                {
+                  "text_th": "Extraction Frequency — ดึงข้อมูลบ่อยแค่ไหน",
+                  "text_en": "Extraction Frequency — how often data is extracted"
+                },
+                {
+                  "text_th": "Tables/Endpoints Extracted — ตาราง หรือ endpoints ที่ดึง",
+                  "text_en": "Tables/Endpoints Extracted — specific tables or API endpoints extracted"
+                }
+              ]
+            },
+            {
+              "id": "error_handling",
+              "heading": "Error Handling and Retry",
+              "description": {
+                "th": "นโยบาย retry และ alert เมื่อ pipeline fail",
+                "en": "Retry policy and alerting when pipelines fail."
+              },
+              "refs": [
+                "data_model_spec"
+              ],
+              "items": [
+                {
+                  "text_th": "Retry Policy — retry กี่ครั้ง และ backoff strategy",
+                  "text_en": "Retry Policy — retry count and backoff strategy"
+                },
+                {
+                  "text_th": "Failure Alert — ใครรับ alert เมื่อ pipeline fail",
+                  "text_en": "Failure Alert — who receives alerts when a pipeline fails"
+                },
+                {
+                  "text_th": "Partial Failure Handling — ถ้าบาง rows fail ทั้ง pipeline หยุดหรือ skip?",
+                  "text_en": "Partial Failure Handling — whether partial row failures halt or skip the pipeline"
+                },
+                {
+                  "text_th": "Dead Letter Queue — วิธีจัดการ records ที่ process ไม่ได้",
+                  "text_en": "Dead Letter Queue — how unprocessable records are handled"
+                }
+              ]
+            },
+            {
+              "id": "credentials_secrets",
+              "heading": "Credentials & Secret Management",
+              "description": {
+                "th": "การจัดเก็บและ rotate credentials ที่ pipeline ใช้เชื่อม source/destination",
+                "en": "Storage and rotation of credentials pipelines use for sources/destinations."
+              },
+              "refs": [],
+              "items": [
+                {
+                  "text_th": "Secret ต่อ connection (source DB, warehouse, API) เก็บที่ไหน — ห้าม hardcode ใน pipeline code/repo",
+                  "text_en": "Secret per connection (source DB, warehouse, API) and its storage — never hardcoded in pipeline code/repo"
+                },
+                {
+                  "text_th": "Rotation policy และผลกระทบต่อ pipeline schedule",
+                  "text_en": "Rotation policy and its impact on pipeline schedules"
+                },
+                {
+                  "text_th": "Least-privilege service accounts ต่อ pipeline (read-only ที่ source, scoped write ที่ destination)",
+                  "text_en": "Least-privilege service accounts per pipeline (read-only at source, scoped write at destination)"
+                },
+                {
+                  "text_th": "Audit การใช้ credential และ alert เมื่อ auth fail",
+                  "text_en": "Credential usage audit and alerts on auth failures"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "data_quality",
+          "filename": "DATA_QUALITY.md",
+          "title": "Data Quality Spec",
+          "description": {
+            "th": "Validation rules, null checks, range checks และ anomaly detection rules สำหรับ data pipeline",
+            "en": "Validation rules, null checks, range checks, and anomaly detection for data pipelines."
+          },
+          "priority": "P0",
+          "depends_on": [
+            "data_model_spec",
+            "pipeline_spec"
+          ],
+          "output_format": {
+            "type": "markdown",
+            "suggested_headings": [
+              "Null and Completeness Checks",
+              "Range and Validity Checks",
+              "Referential Integrity Checks",
+              "Anomaly Detection Rules",
+              "Quality Dashboards"
+            ]
+          },
+          "agent_hints": {
+            "instruction": "Generate a DATA_QUALITY.md defining all data quality rules. For each rule include: rule name, table/column it applies to, rule type (null check, range check, referential integrity, anomaly), expected behavior, actual SQL assertion, severity (error/warning), and action on failure. Examples: MRR must never be negative; missing org_id is a blocking error; churn rate > 20% triggers an anomaly alert.",
+            "input_context": "Rules must reference tables in DATA_MODEL_SPEC.md. Rules must protect the metric calculations in METRIC_LOGIC.md from bad input data.",
+            "estimated_length": "500-900 words",
+            "validation": "Every fact table in DATA_MODEL_SPEC.md must have at least one quality rule. Rules must specify severity (error = blocks pipeline, warning = alerts only). Anomaly detection must define alert thresholds numerically."
+          },
+          "sections": [
+            {
+              "id": "null_completeness_checks",
+              "heading": "Null and Completeness Checks",
+              "description": {
+                "th": "ตรวจว่า fields ที่ required ไม่เป็น null และ data ครบถ้วน",
+                "en": "Verify required fields are not null and data is complete."
+              },
+              "refs": [
+                "data_model_spec",
+                "pipeline_spec"
+              ],
+              "items": [
+                {
+                  "text_th": "Required Non-null Fields — fields ที่ต้องไม่ null เช่น org_id, event_date",
+                  "text_en": "Required Non-null Fields — fields that must not be null, e.g. org_id, event_date"
+                },
+                {
+                  "text_th": "Completeness Rate — % rows ที่ต้องมี value ครบ (target: 99.9%)",
+                  "text_en": "Completeness Rate — % of rows that must have complete values (target: 99.9%)"
+                },
+                {
+                  "text_th": "Missing Data Pattern — pattern ของ missing data ที่ต้อง alert เช่น gap ใน time series",
+                  "text_en": "Missing Data Pattern — alerting patterns for missing data, e.g. time series gaps"
+                }
+              ]
+            },
+            {
+              "id": "range_validity_checks",
+              "heading": "Range and Validity Checks",
+              "description": {
+                "th": "ตรวจว่าค่าอยู่ใน range ที่ valid",
+                "en": "Verify values are within valid ranges."
+              },
+              "refs": [
+                "data_model_spec",
+                "metric_logic"
+              ],
+              "items": [
+                {
+                  "text_th": "Numeric Range — เช่น MRR >= 0, churn_rate 0-100%",
+                  "text_en": "Numeric Range — e.g. MRR >= 0, churn_rate 0-100%"
+                },
+                {
+                  "text_th": "Enum Validation — ค่า categorical ต้องอยู่ใน allowed values",
+                  "text_en": "Enum Validation — categorical values must be in allowed values list"
+                },
+                {
+                  "text_th": "Date Range — dates ต้องไม่อยู่ในอนาคตหรือก่อนวัน company founded",
+                  "text_en": "Date Range — dates must not be in the future or before company founding date"
+                }
+              ]
+            },
+            {
+              "id": "referential_integrity_checks",
+              "heading": "Referential Integrity Checks",
+              "description": {
+                "th": "ตรวจว่า foreign key relationships ถูกต้อง",
+                "en": "Verify foreign key relationships are valid."
+              },
+              "refs": [
+                "data_model_spec"
+              ],
+              "items": [
+                {
+                  "text_th": "FK Existence — ทุก foreign key ต้อง exist ใน dimension table",
+                  "text_en": "FK Existence — every foreign key must exist in the dimension table"
+                },
+                {
+                  "text_th": "Orphan Records — records ที่มี FK ชี้ไปที่ row ที่ไม่มีอยู่",
+                  "text_en": "Orphan Records — records with FK pointing to non-existent rows"
+                },
+                {
+                  "text_th": "Cardinality Check — ตรวจ 1:N, N:M relationships ว่าถูกต้อง",
+                  "text_en": "Cardinality Check — verify 1:N, N:M relationships are correct"
+                }
+              ]
+            },
+            {
+              "id": "anomaly_detection_rules",
+              "heading": "Anomaly Detection Rules",
+              "description": {
+                "th": "Rules สำหรับตรวจจับค่าผิดปกติใน metrics",
+                "en": "Rules for detecting anomalous metric values."
+              },
+              "refs": [
+                "metric_logic",
+                "pipeline_spec"
+              ],
+              "items": [
+                {
+                  "text_th": "Threshold-based — เช่น churn rate > 20% หรือ MRR drop > 15%",
+                  "text_en": "Threshold-based — e.g. churn rate > 20% or MRR drop > 15%"
+                },
+                {
+                  "text_th": "Statistical — ค่าที่เกิน 3 standard deviations จาก rolling average",
+                  "text_en": "Statistical — values exceeding 3 standard deviations from rolling average"
+                },
+                {
+                  "text_th": "Volume-based — row count เปลี่ยนแปลงมากกว่า 30% จาก previous run",
+                  "text_en": "Volume-based — row count changes by more than 30% from previous run"
+                },
+                {
+                  "text_th": "Alert Configuration — severity level และ notification channel ต่อ rule",
+                  "text_en": "Alert Configuration — severity level and notification channel per rule"
+                }
+              ]
+            },
+            {
+              "id": "quality_dashboards",
+              "heading": "Quality Dashboards",
+              "description": {
+                "th": "Dashboard สำหรับ monitor data quality metrics",
+                "en": "Dashboards for monitoring data quality metrics."
+              },
+              "refs": [
+                "data_model_spec",
+                "pipeline_spec"
+              ],
+              "items": [
+                {
+                  "text_th": "Quality Score — aggregate quality score ต่อ table/pipeline",
+                  "text_en": "Quality Score — aggregate quality score per table and pipeline"
+                },
+                {
+                  "text_th": "Trend Charts — trend ของ null rate, anomaly count, freshness ตลอดเวลา",
+                  "text_en": "Trend Charts — trends of null rate, anomaly count, freshness over time"
+                },
+                {
+                  "text_th": "Severity Distribution — จำนวน errors vs warnings per day",
+                  "text_en": "Severity Distribution — count of errors vs warnings per day"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "sla_freshness",
+          "filename": "SLA_FRESHNESS.md",
+          "title": "SLA / Freshness Spec",
+          "description": {
+            "th": "Refresh frequency, delay tolerance และ alert rules สำหรับทุก pipeline และ dashboard",
+            "en": "Refresh frequency, delay tolerance, and alert rules for all pipelines and dashboards."
+          },
+          "priority": "P1",
+          "depends_on": [
+            "pipeline_spec"
+          ],
+          "output_format": {
+            "type": "markdown",
+            "suggested_headings": [
+              "Freshness Requirements per Dataset",
+              "Delay Tolerance Matrix",
+              "Alert Rules",
+              "Escalation Procedures"
+            ]
+          },
+          "agent_hints": {
+            "instruction": "Generate an SLA_FRESHNESS.md specifying data freshness requirements. For each dataset or dashboard include: required refresh frequency, maximum acceptable delay (delay tolerance), the measurement window, alert threshold (when to page on-call), and the escalation procedure. Distinguish between business-critical datasets (e.g. MRR) and informational datasets.",
+            "input_context": "Freshness requirements must be consistent with PIPELINE_SPEC.md schedules. Alert thresholds inform the monitoring configuration.",
+            "estimated_length": "600-900 words",
+            "validation": "Every pipeline in PIPELINE_SPEC.md must have a freshness SLA entry. Each entry must have: refresh_frequency, delay_tolerance, alert_threshold, escalation_contact."
+          },
+          "sections": [
+            {
+              "id": "freshness_requirements",
+              "heading": "Freshness Requirements per Dataset",
+              "description": {
+                "th": "SLA ด้าน freshness ของ data แต่ละชุด",
+                "en": "Data freshness SLA for each dataset."
+              },
+              "refs": [
+                "pipeline_spec",
+                "dashboard_spec"
+              ],
+              "items": [
+                {
+                  "text_th": "Dataset / Pipeline — ชื่อ dataset หรือ pipeline ที่กำหนด SLA",
+                  "text_en": "Dataset / Pipeline — name of the dataset or pipeline with this SLA"
+                },
+                {
+                  "text_th": "Refresh Frequency — อัพเดตข้อมูลบ่อยแค่ไหน เช่น hourly, daily",
+                  "text_en": "Refresh Frequency — how often data is refreshed, e.g. hourly, daily"
+                },
+                {
+                  "text_th": "Business Criticality — business-critical (P0) หรือ informational (P1/P2)",
+                  "text_en": "Business Criticality — business-critical (P0) or informational (P1/P2)"
+                }
+              ]
+            },
+            {
+              "id": "delay_tolerance_matrix",
+              "heading": "Delay Tolerance Matrix",
+              "description": {
+                "th": "ตาราง maximum acceptable delay ต่อ dataset",
+                "en": "Matrix of maximum acceptable delay per dataset."
+              },
+              "refs": [
+                "pipeline_spec"
+              ],
+              "items": [
+                {
+                  "text_th": "Delay Tolerance — ช้าได้มากแค่ไหน เช่น ไม่เกิน 2 ชั่วโมง",
+                  "text_en": "Delay Tolerance — maximum acceptable delay, e.g. no more than 2 hours"
+                },
+                {
+                  "text_th": "Measurement Window — วัดจากเวลาไหนถึงเวลาไหน",
+                  "text_en": "Measurement Window — time range used to measure freshness"
+                },
+                {
+                  "text_th": "Business Impact of Delay — ผลกระทบถ้า data ช้ากว่า tolerance",
+                  "text_en": "Business Impact of Delay — impact when data exceeds delay tolerance"
+                }
+              ]
+            },
+            {
+              "id": "alert_rules",
+              "heading": "Alert Rules",
+              "description": {
+                "th": "Rules สำหรับ trigger alert เมื่อ data ไม่ fresh",
+                "en": "Rules for triggering alerts when data is stale."
+              },
+              "refs": [
+                "pipeline_spec",
+                "dashboard_spec"
+              ],
+              "items": [
+                {
+                  "text_th": "Alert Threshold — trigger alert เมื่อ data เก่ากว่า threshold",
+                  "text_en": "Alert Threshold — trigger alert when data is older than threshold"
+                },
+                {
+                  "text_th": "Alert Channel — ส่ง alert ไปที่ไหน เช่น Slack, PagerDuty, email",
+                  "text_en": "Alert Channel — where alerts are sent, e.g. Slack, PagerDuty, email"
+                },
+                {
+                  "text_th": "Alert Frequency — alert ซ้ำทุกกี่นาทีถ้ายังไม่ resolved",
+                  "text_en": "Alert Frequency — how often alerts repeat if unresolved"
+                }
+              ]
+            },
+            {
+              "id": "escalation_procedures",
+              "heading": "Escalation Procedures",
+              "description": {
+                "th": "ขั้นตอน escalation เมื่อ freshness SLA breach",
+                "en": "Escalation steps when freshness SLA is breached."
+              },
+              "refs": [
+                "pipeline_spec"
+              ],
+              "items": [
+                {
+                  "text_th": "First Responder — ใครรับ alert แรก พร้อม contact",
+                  "text_en": "First Responder — who receives the first alert with contact details"
+                },
+                {
+                  "text_th": "Escalation Timeline — escalate ภายในกี่นาทีถ้า unresolved",
+                  "text_en": "Escalation Timeline — escalate within N minutes if unresolved"
+                },
+                {
+                  "text_th": "Management Notification — เมื่อไหร่ต้องแจ้ง management",
+                  "text_en": "Management Notification — when to notify management"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "testing_strategy",
+          "filename": "TESTING_STRATEGY.md",
+          "title": "Data Testing Strategy",
+          "description": {
+            "th": "กลยุทธ์ testing สำหรับ data pipelines, dbt models, metric calculations และ dashboard outputs",
+            "en": "Testing strategy for data pipelines, dbt models, metric calculations, and dashboard outputs."
+          },
+          "priority": "P1",
+          "depends_on": [
+            "pipeline_spec",
+            "data_quality",
+            "metric_logic"
+          ],
+          "output_format": {
+            "type": "markdown",
+            "suggested_headings": [
+              "Unit Tests (dbt / SQL)",
+              "Integration Tests",
+              "Metric Validation Tests",
+              "Dashboard Acceptance Tests",
+              "Test Automation and CI"
+            ]
+          },
+          "agent_hints": {
+            "instruction": "Generate a TESTING_STRATEGY.md for the data analytics stack. Cover: (1) Unit tests — dbt schema tests, singular tests, and custom SQL assertions per table; (2) Integration tests — end-to-end pipeline runs verifying row counts and metric values against expected output; (3) Metric validation — cross-check metric outputs against METRIC_SPEC.md formulas using sample data; (4) Dashboard acceptance tests — verify chart renders, filters work, and numbers match pipeline output; (5) CI/CD integration — when tests run, what blocks deployment. Reference DATA_QUALITY.md rules as the baseline for test assertions.",
+            "input_context": "Tests must cover every quality rule in DATA_QUALITY.md. Metric validation tests must reference METRIC_LOGIC.md SQL. Test automation must integrate with the pipeline orchestration tool.",
+            "estimated_length": "500-900 words",
+            "validation": "Every fact table in data_model_spec must have at least one test. Metric validation tests must reference metric_logic SQL. CI/CD section must specify what blocks a deployment (failing tests)."
+          },
+          "sections": [
+            {
+              "id": "unit_tests",
+              "heading": "Unit Tests (dbt / SQL)",
+              "description": {
+                "th": "Unit tests สำหรับ dbt models และ SQL transformations",
+                "en": "Unit tests for dbt models and SQL transformations."
+              },
+              "refs": [
+                "pipeline_spec",
+                "data_quality",
+                "metric_logic"
+              ],
+              "items": [
+                {
+                  "text_th": "dbt Schema Tests — not_null, unique, accepted_values, relationships สำหรับแต่ละ model",
+                  "text_en": "dbt Schema Tests — not_null, unique, accepted_values, relationships per model"
+                },
+                {
+                  "text_th": "Singular Tests — custom SQL assertions เช่น MRR ต้องไม่ติดลบ",
+                  "text_en": "Singular Tests — custom SQL assertions, e.g. MRR must not be negative"
+                },
+                {
+                  "text_th": "Row Count Checks — ตรวจว่า model output ไม่ว่างเปล่าโดยไม่คาดคิด",
+                  "text_en": "Row Count Checks — verify model output is not unexpectedly empty"
+                }
+              ]
+            },
+            {
+              "id": "integration_tests",
+              "heading": "Integration Tests",
+              "description": {
+                "th": "Tests ที่รัน pipeline ครบ cycle และตรวจ output ปลายทาง",
+                "en": "Tests that run the full pipeline cycle and verify end-to-end output."
+              },
+              "refs": [
+                "pipeline_spec",
+                "data_quality"
+              ],
+              "items": [
+                {
+                  "text_th": "End-to-end Pipeline Test — รัน pipeline จาก source ถึง destination แล้วตรวจ output",
+                  "text_en": "End-to-end Pipeline Test — run pipeline from source to destination and verify output"
+                },
+                {
+                  "text_th": "Idempotency Test — รัน pipeline ซ้ำได้โดยไม่ duplicate data",
+                  "text_en": "Idempotency Test — pipeline can be re-run without duplicating data"
+                },
+                {
+                  "text_th": "Backfill Test — ตรวจว่า historical data backfill ทำงานถูกต้อง",
+                  "text_en": "Backfill Test — verify historical data backfill works correctly"
+                }
+              ]
+            },
+            {
+              "id": "metric_validation_tests",
+              "heading": "Metric Validation Tests",
+              "description": {
+                "th": "Tests ที่ cross-check metric output กับ formula ใน METRIC_SPEC.md",
+                "en": "Tests cross-checking metric output against METRIC_SPEC.md formulas."
+              },
+              "refs": [
+                "metric_logic",
+                "data_quality",
+                "metric_spec"
+              ],
+              "items": [
+                {
+                  "text_th": "Golden Dataset Test — เปรียบ metric output กับ expected values ที่คำนวณมือไว้",
+                  "text_en": "Golden Dataset Test — compare metric output against hand-calculated expected values"
+                },
+                {
+                  "text_th": "Formula Consistency Test — ตรวจว่า SQL output ตรงกับ formula ใน METRIC_SPEC.md",
+                  "text_en": "Formula Consistency Test — verify SQL output matches METRIC_SPEC.md formula"
+                },
+                {
+                  "text_th": "Cross-system Reconciliation — cross-check metric ระหว่าง data warehouse กับ source system",
+                  "text_en": "Cross-system Reconciliation — cross-check metrics between data warehouse and source system"
+                }
+              ]
+            },
+            {
+              "id": "dashboard_acceptance_tests",
+              "heading": "Dashboard Acceptance Tests",
+              "description": {
+                "th": "Tests ตรวจว่า dashboard แสดงผลถูกต้อง",
+                "en": "Tests verifying dashboards render correctly."
+              },
+              "refs": [
+                "dashboard_spec",
+                "metric_logic"
+              ],
+              "items": [
+                {
+                  "text_th": "Chart Render Test — ทุก chart ใน dashboard render ได้โดยไม่มี error",
+                  "text_en": "Chart Render Test — all charts render without errors"
+                },
+                {
+                  "text_th": "Filter Test — filters ทำงานและ update data ถูกต้อง",
+                  "text_en": "Filter Test — filters work and update data correctly"
+                },
+                {
+                  "text_th": "Number Match Test — ตัวเลขใน dashboard ตรงกับ pipeline output",
+                  "text_en": "Number Match Test — dashboard numbers match pipeline output"
+                }
+              ]
+            },
+            {
+              "id": "ci_automation",
+              "heading": "Test Automation and CI",
+              "description": {
+                "th": "การ automate การรัน tests และ integration กับ CI/CD pipeline",
+                "en": "Automating test runs and integrating with CI/CD pipelines."
+              },
+              "refs": [
+                "pipeline_spec"
+              ],
+              "items": [
+                {
+                  "text_th": "CI Trigger — tests รัน automatically เมื่อไหร่ เช่น on PR, on schedule",
+                  "text_en": "CI Trigger — when tests run automatically, e.g. on PR, on schedule"
+                },
+                {
+                  "text_th": "Deployment Gate — test ไหน fail แล้ว block deployment",
+                  "text_en": "Deployment Gate — which test failures block deployment"
+                },
+                {
+                  "text_th": "Test Results Reporting — ผล tests ส่งไปที่ไหน เช่น Slack, email",
+                  "text_en": "Test Results Reporting — where test results are sent, e.g. Slack, email"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "phase_output",
+      "order": 4,
+      "title": {
+        "th": "Analytics Output Layer — Consumption",
+        "en": "Analytics Output Layer — Consumption"
+      },
+      "description": {
+        "th": "เป้าหมาย: Document ว่า CEO, CSM และ Finance ใช้ data อย่างไร ผ่าน dashboard และ report",
+        "en": "Goal: Document how CEO, CSM, and Finance consume data through dashboards and reports."
+      },
+      "documents": [
+        {
+          "id": "viz_design_spec",
+          "filename": "VIZ_DESIGN_SPEC.md",
+          "title": "Visualization Design Spec",
+          "description": {
+            "th": "กำหนด chart type, color theme, interaction pattern และ accessibility guidelines สำหรับทุก dashboard — bridge ระหว่าง stakeholders/metric_spec กับ dashboard_spec",
+            "en": "Define chart types, color theme, interaction patterns, and accessibility guidelines for all dashboards — bridging stakeholders/metric_spec to dashboard_spec."
+          },
+          "priority": "P1",
+          "depends_on": [
+            "stakeholders",
+            "metric_spec"
+          ],
+          "output_format": {
+            "type": "markdown",
+            "suggested_headings": [
+              "Chart Type Matrix",
+              "Color & Theme Spec",
+              "Interaction Spec",
+              "Accessibility Guidelines",
+              "Data Literacy Guard Rails"
+            ]
+          },
+          "agent_hints": {
+            "instruction": "Generate a VIZ_DESIGN_SPEC.md that bridges stakeholder needs and metric shapes into concrete visualization standards. (1) Build a chart_type_matrix mapping each metric type (time-series ratio, categorical count, ranking, proportion) to a recommended chart type (line, bar, pie, table, heatmap) with anti-patterns and grain considerations. (2) Define a color_theme_spec with primary/secondary/accent palette, semantic colors (green=positive, red=alert, amber=warning), font rules — then produce a viz_theme.py code block exporting COLOR_PALETTE, FONT_RULES, and CHART_DEFAULTS as a reusable Python module; also output this as a standalone viz_theme.py file alongside the .md. (3) Define interaction_spec: tooltip format per chart type, crosshair behavior and cross-chart sync, click-through drill-down targets, animation rules. (4) Accessibility: WCAG 2.1 AA contrast ratios, colorblind-safe palette variant (protanopia/deuteranopia/tritanopia), screen reader alt-text and aria-label rules, keyboard navigation. (5) Data Literacy Guard Rails: map visualization complexity levels (basic=bar/line/table, intermediate=heatmap/scatter/crosshair, advanced=animated/multi-axis/custom) to each stakeholder group's data_literacy_level from STAKEHOLDERS.md — gate rule: never render a viz above the audience's literacy level.",
+            "input_context": "Read STAKEHOLDERS.md for data_literacy_level per consumer group (basic/intermediate/advanced). Read METRIC_SPEC.md for metric types and grain. For chart type selection, consult references/data-to-viz-main.md (decision tree) and the relevant references/data-to-viz-[chartname].md files for when-to-use, when-not-to-use, and common mistakes per chart type. This document must be completed before DASHBOARD_SPEC.md — dashboard builders must import viz_theme.py and follow chart_type_matrix for every chart.",
+            "estimated_length": "700-1100 words",
+            "validation": "Every metric type in metric_spec must map to a chart type in chart_type_matrix. viz_theme.py must be a valid Python module exporting COLOR_PALETTE, FONT_RULES, and CHART_DEFAULTS. Every chart type in interaction_spec must have tooltip and drill-down target defined. Data literacy guard rails must cover all three literacy levels (basic/intermediate/advanced) defined in stakeholders."
+          },
+          "sections": [
+            {
+              "id": "chart_type_matrix",
+              "heading": "Chart Type Matrix",
+              "description": {
+                "th": "ตารางแมพ metric type กับ chart type ที่แนะนำ พร้อม anti-patterns และ grain consideration",
+                "en": "Matrix mapping metric types to recommended chart types, with anti-patterns and grain considerations."
+              },
+              "refs": [
+                "metric_spec"
+              ],
+              "items": [
+                {
+                  "text_th": "Metric Type Classification — แบ่งประเภท metric เช่น time-series ratio, categorical count, ranking, proportion",
+                  "text_en": "Metric Type Classification — categorize metrics: time-series ratio, categorical count, ranking, proportion"
+                },
+                {
+                  "text_th": "Recommended Chart Type — chart ที่เหมาะสมกับ metric type แต่ละประเภท เช่น line สำหรับ time-series, bar สำหรับ categorical count",
+                  "text_en": "Recommended Chart Type — best chart per metric type, e.g. line for time-series, bar for categorical count"
+                },
+                {
+                  "text_th": "Anti-patterns — chart types ที่ไม่ควรใช้กับ metric type นั้น เช่น pie chart สำหรับ time-series",
+                  "text_en": "Anti-patterns — chart types to avoid per metric type, e.g. pie chart for time-series"
+                },
+                {
+                  "text_th": "Grain Consideration — chart type อาจเปลี่ยนตาม grain เช่น daily → line, monthly → grouped bar",
+                  "text_en": "Grain Consideration — chart type may vary by grain, e.g. daily → line, monthly → grouped bar"
+                }
+              ]
+            },
+            {
+              "id": "color_theme_spec",
+              "heading": "Color & Theme Spec",
+              "description": {
+                "th": "กำหนด color palette, font rules และ viz_theme.py code artifact สำหรับ dashboards ทั้งหมด",
+                "en": "Define color palette, font rules, and viz_theme.py code artifact for all dashboards."
+              },
+              "refs": [],
+              "items": [
+                {
+                  "text_th": "Primary Palette — สีหลัก 5-7 สีสำหรับ data series พร้อม hex codes",
+                  "text_en": "Primary Palette — 5-7 main data series colors with hex codes"
+                },
+                {
+                  "text_th": "Semantic Colors — สีที่มีความหมาย เช่น green=positive trend, red=alert/below target, amber=warning",
+                  "text_en": "Semantic Colors — meaningful colors, e.g. green=positive trend, red=alert/below target, amber=warning"
+                },
+                {
+                  "text_th": "Font Rules — font family, sizes และ weights สำหรับ chart title, axis labels, tooltips และ annotations",
+                  "text_en": "Font Rules — font family, sizes, and weights for chart titles, axis labels, tooltips, and annotations"
+                },
+                {
+                  "text_th": "viz_theme.py — Python module ที่ export COLOR_PALETTE, FONT_RULES, CHART_DEFAULTS — ต้อง generate เป็นไฟล์แยกด้วยไม่ใช่แค่ code block",
+                  "text_en": "viz_theme.py — Python module exporting COLOR_PALETTE, FONT_RULES, CHART_DEFAULTS — must be generated as a standalone file, not just a code block"
+                }
+              ]
+            },
+            {
+              "id": "interaction_spec",
+              "heading": "Interaction Spec",
+              "description": {
+                "th": "กำหนด tooltip, crosshair, click-through และ animation behavior ของแต่ละ chart type",
+                "en": "Define tooltip, crosshair, click-through, and animation behavior per chart type."
+              },
+              "refs": [
+                "metric_spec"
+              ],
+              "items": [
+                {
+                  "text_th": "Tooltip Format — ข้อมูลที่แสดงใน tooltip เช่น metric name, value, % change, period และ unit",
+                  "text_en": "Tooltip Format — data shown in tooltip: metric name, value, % change, period, and unit"
+                },
+                {
+                  "text_th": "Crosshair Behavior — เมื่อไหร่ใช้ crosshair, sync across charts หรือไม่ และ chart types ที่รองรับ",
+                  "text_en": "Crosshair Behavior — when to use crosshair, whether to sync across charts, and which chart types support it"
+                },
+                {
+                  "text_th": "Click-through Targets — click บน chart element นำไปที่ไหน เช่น drill-down, detail page หรือ external link",
+                  "text_en": "Click-through Targets — where clicking a chart element navigates: drill-down, detail page, or external link"
+                },
+                {
+                  "text_th": "Animation Rules — ใช้ animation เมื่อไหร่ เช่น page load, data refresh, พร้อม duration และ easing",
+                  "text_en": "Animation Rules — when to use animation (page load, data refresh) with duration and easing guidelines"
+                }
+              ]
+            },
+            {
+              "id": "accessibility_guidelines",
+              "heading": "Accessibility Guidelines",
+              "description": {
+                "th": "มาตรฐาน accessibility WCAG 2.1 AA สำหรับ dashboard visualizations",
+                "en": "WCAG 2.1 AA accessibility standards for dashboard visualizations."
+              },
+              "refs": [],
+              "items": [
+                {
+                  "text_th": "Color Contrast — WCAG 2.1 AA contrast ratio ขั้นต่ำ 4.5:1 สำหรับ text, 3:1 สำหรับ large text และ UI components",
+                  "text_en": "Color Contrast — WCAG 2.1 AA minimum 4.5:1 for text, 3:1 for large text and UI components"
+                },
+                {
+                  "text_th": "Colorblind-safe Palette — alternative palette สำหรับ protanopia, deuteranopia และ tritanopia",
+                  "text_en": "Colorblind-safe Palette — alternative palette compatible with protanopia, deuteranopia, and tritanopia"
+                },
+                {
+                  "text_th": "Screen Reader Annotations — alt text, aria-labels สำหรับ charts และ data tables",
+                  "text_en": "Screen Reader Annotations — alt text and aria-labels for charts and data tables"
+                },
+                {
+                  "text_th": "Keyboard Navigation — chart interaction ผ่าน keyboard เช่น tab, enter, arrow keys สำหรับ tooltips และ drill-down",
+                  "text_en": "Keyboard Navigation — chart interaction via keyboard: tab, enter, arrow keys for tooltips and drill-down"
+                }
+              ]
+            },
+            {
+              "id": "data_literacy_guard_rails",
+              "heading": "Data Literacy Guard Rails",
+              "description": {
+                "th": "แมพ viz complexity กับ stakeholder data_literacy_level เพื่อป้องกัน viz ที่ซับซ้อนเกิน audience",
+                "en": "Map visualization complexity to stakeholder data_literacy_level to prevent overly complex visualizations for the audience."
+              },
+              "refs": [
+                "stakeholders"
+              ],
+              "items": [
+                {
+                  "text_th": "Complexity Levels — basic (bar/line/table), intermediate (heatmap/scatter/crosshair), advanced (animated/multi-axis/custom)",
+                  "text_en": "Complexity Levels — basic (bar/line/table), intermediate (heatmap/scatter/crosshair), advanced (animated/multi-axis/custom)"
+                },
+                {
+                  "text_th": "Literacy Mapping — stakeholder data_literacy_level → maximum allowed viz complexity level",
+                  "text_en": "Literacy Mapping — stakeholder data_literacy_level → maximum allowed viz complexity level"
+                },
+                {
+                  "text_th": "Gate Rule — ห้ามใช้ viz complexity สูงกว่า data_literacy_level ของ target audience",
+                  "text_en": "Gate Rule — do not use viz complexity above the target audience's data_literacy_level"
+                },
+                {
+                  "text_th": "Override Process — การ override gate rule ต้องมี stakeholder sign-off และ training plan",
+                  "text_en": "Override Process — overriding the gate rule requires stakeholder sign-off and a training plan"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "dashboard_spec",
+          "filename": "DASHBOARD_SPEC.md",
+          "title": "Dashboard Spec",
+          "description": {
+            "th": "อธิบาย purpose, target user, metrics, filters และ drill-down logic ของแต่ละ dashboard",
+            "en": "Purpose, target user, metrics, filters, and drill-down logic for each dashboard."
+          },
+          "priority": "P0",
+          "depends_on": [
+            "metric_spec",
+            "kpi_dictionary",
+            "data_model_spec",
+            "stakeholders",
+            "testing_strategy",
+            "viz_design_spec"
+          ],
+          "output_format": {
+            "type": "markdown",
+            "suggested_headings": [
+              "Dashboard Inventory",
+              "Dashboard Profiles",
+              "Metric Coverage Matrix",
+              "Drill-down Logic",
+              "Refresh Schedule"
+            ]
+          },
+          "agent_hints": {
+            "instruction": "Before writing any chart code, read VIZ_DESIGN_SPEC.md and import viz_theme.py. Chart type must match chart_type_matrix. Interaction must match interaction_spec. Generate a DASHBOARD_SPEC.md documenting every dashboard in the analytics stack. For each dashboard include: name, purpose, target user (CEO/CSM/Finance/Ops), list of metrics displayed (referencing METRIC_SPEC.md), available filters, drill-down paths, refresh schedule, and data source. Create a matrix showing which metrics appear in which dashboards.",
+            "input_context": "Every KPI in KPI_DICTIONARY.md must appear in at least one dashboard. Metric names must match METRIC_SPEC.md exactly. Chart types and interactions must follow VIZ_DESIGN_SPEC.md chart_type_matrix and interaction_spec. When in doubt about a specific chart type, consult references/data-to-viz-[chartname].md for caveats and common mistakes.",
+            "estimated_length": "500-900 words",
+            "validation": "Every dashboard must have: name, purpose, target_user, metrics[] (referencing metric_spec), filters[], refresh_schedule. Every KPI in kpi_dictionary must appear in at least one dashboard. Every chart type must match viz_design_spec.chart_type_matrix. Every interaction must match viz_design_spec.interaction_spec."
+          },
+          "sections": [
+            {
+              "id": "dashboard_inventory",
+              "heading": "Dashboard Inventory",
+              "description": {
+                "th": "รายชื่อ dashboards ทั้งหมดใน analytics stack",
+                "en": "List of all dashboards in the analytics stack."
+              },
+              "refs": [
+                "metric_spec",
+                "kpi_dictionary"
+              ],
+              "items": [
+                {
+                  "text_th": "Dashboard Name — ชื่อ dashboard และ version ปัจจุบัน",
+                  "text_en": "Dashboard Name — dashboard name and current version"
+                },
+                {
+                  "text_th": "Tool / Platform — เครื่องมือที่ใช้ เช่น Zoho Analytics, Looker, Metabase",
+                  "text_en": "Tool / Platform — tool used, e.g. Zoho Analytics, Looker, Metabase"
+                },
+                {
+                  "text_th": "URL / Access Path — link หรือเส้นทางเข้าถึง dashboard",
+                  "text_en": "URL / Access Path — link or path to access the dashboard"
+                },
+                {
+                  "text_th": "Owner — ทีมที่รับผิดชอบดูแล dashboard นี้",
+                  "text_en": "Owner — team responsible for maintaining this dashboard"
+                }
+              ]
+            },
+            {
+              "id": "dashboard_profiles",
+              "heading": "Dashboard Profiles",
+              "description": {
+                "th": "รายละเอียดของแต่ละ dashboard",
+                "en": "Detailed profile for each dashboard."
+              },
+              "refs": [
+                "metric_spec",
+                "kpi_dictionary",
+                "data_model_spec",
+                "stakeholders",
+                "viz_design_spec"
+              ],
+              "items": [
+                {
+                  "text_th": "Dashboard Name — ชื่อ dashboard",
+                  "text_en": "Dashboard Name — dashboard name"
+                },
+                {
+                  "text_th": "Purpose — วัตถุประสงค์ของ dashboard นี้",
+                  "text_en": "Purpose — the goal this dashboard serves"
+                },
+                {
+                  "text_th": "Target User — CEO, CSM, Finance, Ops",
+                  "text_en": "Target User — CEO, CSM, Finance, or Ops"
+                },
+                {
+                  "text_th": "Data Source — tables ที่ dashboard นี้ query (อ้างอิง DATA_MODEL_SPEC.md)",
+                  "text_en": "Data Source — tables this dashboard queries (referencing DATA_MODEL_SPEC.md)"
+                }
+              ]
+            },
+            {
+              "id": "metric_coverage_matrix",
+              "heading": "Metric Coverage Matrix",
+              "description": {
+                "th": "ตารางแสดงว่า metric ไหนปรากฏใน dashboard ไหน",
+                "en": "Matrix showing which metrics appear in which dashboards."
+              },
+              "refs": [
+                "metric_spec",
+                "kpi_dictionary"
+              ],
+              "items": [
+                {
+                  "text_th": "Metric-to-Dashboard mapping — แต่ละ metric ปรากฏใน dashboard ไหนบ้าง",
+                  "text_en": "Metric-to-Dashboard mapping — which dashboards each metric appears in"
+                },
+                {
+                  "text_th": "KPI coverage — ทุก KPI ใน kpi_dictionary ต้องมี dashboard แสดง",
+                  "text_en": "KPI coverage — every KPI in kpi_dictionary must appear in at least one dashboard"
+                },
+                {
+                  "text_th": "Missing coverage — metrics ที่ยังไม่มี dashboard แสดง",
+                  "text_en": "Missing coverage — metrics not yet shown in any dashboard"
+                }
+              ]
+            },
+            {
+              "id": "drilldown_logic",
+              "heading": "Drill-down Logic",
+              "description": {
+                "th": "เส้นทาง drill-down ที่ user สามารถทำได้ในแต่ละ dashboard",
+                "en": "Drill-down paths available to users in each dashboard."
+              },
+              "refs": [
+                "metric_spec",
+                "data_model_spec",
+                "viz_design_spec"
+              ],
+              "items": [
+                {
+                  "text_th": "Drill-down Path — จาก summary → detail ผ่าน dimensions อะไร",
+                  "text_en": "Drill-down Path — from summary to detail through which dimensions"
+                },
+                {
+                  "text_th": "Available Filters — filter ที่ user ใช้ได้ใน dashboard",
+                  "text_en": "Available Filters — user-configurable filters in the dashboard"
+                },
+                {
+                  "text_th": "Cross-dashboard Links — dashboard อื่นที่ link ถึงกันได้",
+                  "text_en": "Cross-dashboard Links — related dashboards users can navigate to"
+                }
+              ]
+            },
+            {
+              "id": "refresh_schedule",
+              "heading": "Refresh Schedule",
+              "description": {
+                "th": "ตาราง refresh schedule ของแต่ละ dashboard",
+                "en": "Refresh schedule for each dashboard."
+              },
+              "refs": [
+                "pipeline_spec",
+                "sla_freshness"
+              ],
+              "items": [
+                {
+                  "text_th": "Refresh Frequency — data ใน dashboard อัพเดตบ่อยแค่ไหน",
+                  "text_en": "Refresh Frequency — how often dashboard data is refreshed"
+                },
+                {
+                  "text_th": "Data Source Pipeline — pipeline ไหนที่ feed data ให้ dashboard",
+                  "text_en": "Data Source Pipeline — which pipeline feeds data to this dashboard"
+                },
+                {
+                  "text_th": "Last Refresh Indicator — แสดงเวลาที่ data อัพเดตล่าสุดบน dashboard",
+                  "text_en": "Last Refresh Indicator — display last data refresh time on the dashboard"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "report_spec",
+          "filename": "REPORT_SPEC.md",
+          "title": "Report Spec",
+          "description": {
+            "th": "รูปแบบ, KPIs และ distribution channel ของ scheduled reports",
+            "en": "Format, KPIs, and distribution channels for scheduled reports."
+          },
+          "priority": "P1",
+          "depends_on": [
+            "dashboard_spec",
+            "kpi_dictionary",
+            "metric_spec",
+            "stakeholders",
+            "sla_freshness"
+          ],
+          "output_format": {
+            "type": "markdown",
+            "suggested_headings": [
+              "Report Profiles",
+              "KPI Coverage",
+              "Distribution Schedule",
+              "Template Definitions"
+            ]
+          },
+          "agent_hints": {
+            "instruction": "Generate a REPORT_SPEC.md documenting all recurring reports. For each report include: name, format (PDF/Zoho Analytics/email), frequency (weekly/monthly), KPIs included (referencing KPI_DICTIONARY.md), target audience, distribution channel (Zoho Cliq/email/auto), and the template layout. Note the deadline (when the report must be ready after period close).",
+            "input_context": "KPI names must match KPI_DICTIONARY.md. Distribution channels must align with available tools (Zoho, email, Slack).",
+            "estimated_length": "600-900 words",
+            "validation": "Each report must have: name, format, frequency, kpis[] (referencing kpi_dictionary), audience, distribution_channel, deadline_after_period_close."
+          },
+          "sections": [
+            {
+              "id": "report_profiles",
+              "heading": "Report Profiles",
+              "description": {
+                "th": "รายละเอียดของแต่ละ scheduled report",
+                "en": "Detailed profile for each scheduled report."
+              },
+              "refs": [
+                "dashboard_spec",
+                "kpi_dictionary",
+                "metric_spec",
+                "stakeholders"
+              ],
+              "items": [
+                {
+                  "text_th": "Report Name — ชื่อ report และ purpose",
+                  "text_en": "Report Name — report name and purpose"
+                },
+                {
+                  "text_th": "Format — PDF, Zoho Analytics, email HTML",
+                  "text_en": "Format — PDF, Zoho Analytics, or email HTML"
+                },
+                {
+                  "text_th": "Frequency — weekly, monthly, quarterly",
+                  "text_en": "Frequency — weekly, monthly, or quarterly"
+                },
+                {
+                  "text_th": "Target Audience — ใครเป็นผู้รับ report (อ้างอิง STAKEHOLDERS.md)",
+                  "text_en": "Target Audience — who receives the report (referencing STAKEHOLDERS.md)"
+                }
+              ]
+            },
+            {
+              "id": "kpi_coverage",
+              "heading": "KPI Coverage",
+              "description": {
+                "th": "ตรวจว่า KPIs ทุกตัวถูกครอบคลุมโดย report อย่างน้อย 1 ฉบับ",
+                "en": "Verify every KPI is covered by at least one report."
+              },
+              "refs": [
+                "kpi_dictionary",
+                "metric_spec"
+              ],
+              "items": [
+                {
+                  "text_th": "KPIs Included — list ของ KPIs ในแต่ละ report",
+                  "text_en": "KPIs Included — list of KPIs in each report"
+                },
+                {
+                  "text_th": "Coverage Matrix — ตาราง KPI × Report แสดงว่า KPI ไหนอยู่ใน report ไหน",
+                  "text_en": "Coverage Matrix — KPI × Report table showing which KPIs appear in which reports"
+                },
+                {
+                  "text_th": "Missing Coverage — KPIs ที่ยังไม่มี report ครอบคลุม",
+                  "text_en": "Missing Coverage — KPIs not yet covered by any report"
+                }
+              ]
+            },
+            {
+              "id": "distribution_schedule",
+              "heading": "Distribution Schedule",
+              "description": {
+                "th": "ตาราง schedule การส่ง report และ deadline",
+                "en": "Schedule for report delivery and deadlines."
+              },
+              "refs": [
+                "dashboard_spec",
+                "sla_freshness"
+              ],
+              "items": [
+                {
+                  "text_th": "Distribution Channel — ส่งผ่าน Zoho Cliq, email, auto-generated",
+                  "text_en": "Distribution Channel — delivery via Zoho Cliq, email, or auto-generated"
+                },
+                {
+                  "text_th": "Deadline — ต้องส่งภายในกี่วันหลัง period close",
+                  "text_en": "Deadline — days after period close by which report must be delivered"
+                },
+                {
+                  "text_th": "Distribution List — รายชื่อผู้รับ report แต่ละฉบับ",
+                  "text_en": "Distribution List — list of recipients for each report"
+                }
+              ]
+            },
+            {
+              "id": "template_definitions",
+              "heading": "Template Definitions",
+              "description": {
+                "th": "Template layout ของแต่ละ report",
+                "en": "Template layout for each report."
+              },
+              "refs": [
+                "kpi_dictionary"
+              ],
+              "items": [
+                {
+                  "text_th": "Template Layout — โครงสร้าง sections ของ report เช่น Executive Summary, Detail Tables",
+                  "text_en": "Template Layout — report section structure, e.g. Executive Summary, Detail Tables"
+                },
+                {
+                  "text_th": "Chart Types — ชนิด chart ที่ใช้ เช่น line, bar, table",
+                  "text_en": "Chart Types — chart types used, e.g. line, bar, table"
+                },
+                {
+                  "text_th": "Branding — logo, color scheme, header/footer",
+                  "text_en": "Branding — logo, color scheme, header and footer"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "phase_governance",
+      "order": 5,
+      "title": {
+        "th": "Governance & AI Layer",
+        "en": "Governance & AI Layer"
+      },
+      "description": {
+        "th": "เป้าหมาย: สร้าง governance framework ที่รองรับ PDPA, AI automation และ scaling",
+        "en": "Goal: Build a governance framework supporting PDPA compliance, AI automation, and organizational scaling."
+      },
+      "documents": [
+        {
+          "id": "data_governance",
+          "filename": "DATA_GOVERNANCE.md",
+          "title": "Data Governance Spec",
+          "description": {
+            "th": "Owner, access control, data classification (PII/PDPA) และ governance policies",
+            "en": "Data ownership, access control, PII/PDPA classification, and governance policies."
+          },
+          "priority": "P0",
+          "depends_on": [
+            "data_model_spec",
+            "data_contract",
+            "kpi_dictionary"
+          ],
+          "output_format": {
+            "type": "markdown",
+            "suggested_headings": [
+              "Data Ownership Matrix",
+              "Access Control Policy",
+              "PDPA and PII Classification",
+              "Data Retention Policy",
+              "Audit Requirements",
+              "Cost Governance"
+            ]
+          },
+          "agent_hints": {
+            "instruction": "Generate a DATA_GOVERNANCE.md defining the governance framework. Create a data ownership matrix mapping each dataset to a Data Owner and Data Steward. Define access control policy (who can query what). Provide PDPA/PII classification for all tables in DATA_MODEL_SPEC.md. Specify data retention periods and deletion procedures. Define audit log requirements for data access.",
+            "input_context": "PII classification must cover every column in DATA_MODEL_SPEC.md that contains customer information. Access control must be consistent with DATA_CONTRACT.md SLA commitments.",
+            "estimated_length": "600-1000 words",
+            "validation": "Every dataset must have a named Data Owner and Data Steward. Every table in data_model_spec must have a PII classification. Access control policy must specify roles and what each role can access. Retention periods must be numeric (e.g. 36 months)."
+          },
+          "sections": [
+            {
+              "id": "data_ownership_matrix",
+              "heading": "Data Ownership Matrix",
+              "description": {
+                "th": "ตาราง mapping ระหว่าง dataset กับ Data Owner และ Data Steward",
+                "en": "Matrix mapping datasets to Data Owners and Data Stewards."
+              },
+              "refs": [
+                "data_model_spec",
+                "kpi_dictionary"
+              ],
+              "items": [
+                {
+                  "text_th": "Data Owner — ทีมที่ 'own' dataset นั้น (รับผิดชอบ quality)",
+                  "text_en": "Data Owner — team that owns the dataset (accountable for quality)"
+                },
+                {
+                  "text_th": "Data Steward — คนที่ดูแล day-to-day ของ data นั้น",
+                  "text_en": "Data Steward — person managing day-to-day data operations"
+                },
+                {
+                  "text_th": "Escalation Contact — ติดต่อใครเมื่อมี issue กับ dataset นี้",
+                  "text_en": "Escalation Contact — who to contact when there is an issue with this dataset"
+                }
+              ]
+            },
+            {
+              "id": "access_control_policy",
+              "heading": "Access Control Policy",
+              "description": {
+                "th": "นโยบาย access control — role ไหน query อะไรได้บ้าง",
+                "en": "Access control policy — which roles can query which datasets."
+              },
+              "refs": [
+                "data_model_spec",
+                "data_contract"
+              ],
+              "items": [
+                {
+                  "text_th": "Role Definitions — roles ที่มีสิทธิ์เข้าถึง data เช่น analyst, engineer, viewer",
+                  "text_en": "Role Definitions — roles with data access, e.g. analyst, engineer, viewer"
+                },
+                {
+                  "text_th": "Role × Dataset Matrix — ตาราง role ไหน query dataset ไหนได้",
+                  "text_en": "Role × Dataset Matrix — which roles can query which datasets"
+                },
+                {
+                  "text_th": "Sensitive Data Access — ขั้นตอนขอสิทธิ์ access PII/sensitive columns",
+                  "text_en": "Sensitive Data Access — process for requesting access to PII/sensitive columns"
+                }
+              ]
+            },
+            {
+              "id": "pdpa_pii_classification",
+              "heading": "PDPA and PII Classification",
+              "description": {
+                "th": "จำแนก columns ที่เป็น Personal Data ตาม PDPA",
+                "en": "Classify columns containing Personal Data per PDPA."
+              },
+              "refs": [
+                "data_model_spec"
+              ],
+              "items": [
+                {
+                  "text_th": "PII Columns — ระบุทุก column ที่เป็น Personal Data พร้อม classification level",
+                  "text_en": "PII Columns — list all Personal Data columns with classification level"
+                },
+                {
+                  "text_th": "Masking / Anonymization — วิธี mask หรือ anonymize PII สำหรับ non-privileged access",
+                  "text_en": "Masking / Anonymization — how to mask or anonymize PII for non-privileged access"
+                },
+                {
+                  "text_th": "Legal Basis — เหตุผลทางกฎหมายในการเก็บ PII แต่ละประเภท",
+                  "text_en": "Legal Basis — legal grounds for retaining each type of PII"
+                }
+              ]
+            },
+            {
+              "id": "data_retention_policy",
+              "heading": "Data Retention Policy",
+              "description": {
+                "th": "นโยบาย retention — เก็บข้อมูลนานแค่ไหน ลบอย่างไร",
+                "en": "Retention policy — how long data is kept and deletion procedures."
+              },
+              "refs": [
+                "data_model_spec",
+                "data_contract"
+              ],
+              "items": [
+                {
+                  "text_th": "Retention Period — จำนวนเดือนที่เก็บ data แต่ละ dataset",
+                  "text_en": "Retention Period — number of months to retain each dataset"
+                },
+                {
+                  "text_th": "Deletion Procedure — วิธีลบ data เมื่อ retention period หมด",
+                  "text_en": "Deletion Procedure — how to delete data when retention period expires"
+                },
+                {
+                  "text_th": "Archival Policy — data ที่ archive ไปที่ cold storage vs ลบทิ้ง",
+                  "text_en": "Archival Policy — data archived to cold storage vs permanently deleted"
+                }
+              ]
+            },
+            {
+              "id": "audit_requirements",
+              "heading": "Audit Requirements",
+              "description": {
+                "th": "ข้อกำหนด audit log สำหรับ data access และ changes",
+                "en": "Audit log requirements for data access and changes."
+              },
+              "refs": [
+                "data_model_spec"
+              ],
+              "items": [
+                {
+                  "text_th": "Access Logging — log ทุกครั้งที่มีคน query sensitive data",
+                  "text_en": "Access Logging — log every query against sensitive data"
+                },
+                {
+                  "text_th": "Change Logging — log ทุกครั้งที่มีการ update/delete records",
+                  "text_en": "Change Logging — log every update or delete of records"
+                },
+                {
+                  "text_th": "Audit Review Cadence — ตรวจ audit log บ่อยแค่ไหน",
+                  "text_en": "Audit Review Cadence — how often audit logs are reviewed"
+                }
+              ]
+            },
+            {
+              "id": "cost_governance",
+              "heading": "Cost Governance",
+              "description": {
+                "th": "การควบคุมค่าใช้จ่าย warehouse และ query cost",
+                "en": "Controlling warehouse spend and query costs."
+              },
+              "refs": [],
+              "items": [
+                {
+                  "text_th": "Cost budget ต่อเดือนของ warehouse/compute พร้อม owner",
+                  "text_en": "Monthly warehouse/compute cost budget with an owner"
+                },
+                {
+                  "text_th": "Cost monitoring dashboard และ alert thresholds (warning/critical)",
+                  "text_en": "Cost monitoring dashboard and alert thresholds (warning/critical)"
+                },
+                {
+                  "text_th": "Query cost guard rails — limit ต่อ user/role, kill runaway queries",
+                  "text_en": "Query cost guard rails — per user/role limits, kill runaway queries"
+                },
+                {
+                  "text_th": "Cost attribution ต่อ team/dashboard/pipeline เพื่อหา top spenders",
+                  "text_en": "Cost attribution per team/dashboard/pipeline to identify top spenders"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "lineage",
+          "filename": "LINEAGE.md",
+          "title": "Lineage Documentation",
+          "description": {
+            "th": "ติดตาม metric → table → source system และ impact analysis",
+            "en": "Trace metric → table → source system and perform impact analysis."
+          },
+          "priority": "P1",
+          "depends_on": [
+            "metric_logic",
+            "pipeline_spec",
+            "data_model_spec",
+            "dashboard_spec"
+          ],
+          "output_format": {
+            "type": "markdown",
+            "suggested_headings": [
+              "Metric-to-Source Traces",
+              "Table-level Lineage",
+              "Impact Analysis Matrix",
+              "Breaking Change Impact"
+            ]
+          },
+          "agent_hints": {
+            "instruction": "Generate a LINEAGE.md documenting the full data lineage. For each metric, trace: metric → SQL model → intermediate tables → source tables → source system. Use Mermaid diagrams to visualize the lineage graph. Build an impact analysis matrix showing: if source system X changes, which metrics and dashboards are affected. Document the blast radius of each pipeline.",
+            "input_context": "Lineage must trace all metrics from METRIC_LOGIC.md through PIPELINE_SPEC.md back to source systems. Impact analysis supports change management.",
+            "estimated_length": "500-900 words",
+            "validation": "Every metric in metric_logic must have a complete lineage trace from metric to source system. Impact analysis matrix must cover all source systems in pipeline_spec. Mermaid lineage diagram is required."
+          },
+          "sections": [
+            {
+              "id": "metric_to_source_traces",
+              "heading": "Metric-to-Source Traces",
+              "description": {
+                "th": "การติดตาม metric → table → source แบบ end-to-end",
+                "en": "End-to-end traces from metric to source system."
+              },
+              "refs": [
+                "metric_logic",
+                "pipeline_spec",
+                "data_model_spec"
+              ],
+              "items": [
+                {
+                  "text_th": "Metric-to-Source Trace — metric → SQL model → table → source system",
+                  "text_en": "Metric-to-Source Trace — metric → SQL model → table → source system"
+                },
+                {
+                  "text_th": "Lineage Diagram — Mermaid diagram แสดง data flow",
+                  "text_en": "Lineage Diagram — Mermaid diagram showing data flow"
+                },
+                {
+                  "text_th": "Column-level Lineage — ติดตามระดับ column ว่ามาจาก source column ไหน",
+                  "text_en": "Column-level Lineage — trace at column level to source columns"
+                }
+              ]
+            },
+            {
+              "id": "table_level_lineage",
+              "heading": "Table-level Lineage",
+              "description": {
+                "th": "ติดตาม data flow ระดับ table",
+                "en": "Track data flow at the table level."
+              },
+              "refs": [
+                "data_model_spec",
+                "pipeline_spec"
+              ],
+              "items": [
+                {
+                  "text_th": "Source → Staging → Intermediate → Mart mapping",
+                  "text_en": "Source → Staging → Intermediate → Mart mapping"
+                },
+                {
+                  "text_th": "Table Dependency DAG — Mermaid diagram แสดง table dependencies",
+                  "text_en": "Table Dependency DAG — Mermaid diagram of table dependencies"
+                },
+                {
+                  "text_th": "Refresh Order — ลำดับการ refresh tables ตาม dependency",
+                  "text_en": "Refresh Order — order in which tables must be refreshed based on dependencies"
+                }
+              ]
+            },
+            {
+              "id": "impact_analysis_matrix",
+              "heading": "Impact Analysis Matrix",
+              "description": {
+                "th": "ตารางวิเคราะห์ผลกระทบเมื่อ source system เปลี่ยน",
+                "en": "Matrix analyzing impact when source systems change."
+              },
+              "refs": [
+                "metric_logic",
+                "pipeline_spec",
+                "data_model_spec"
+              ],
+              "items": [
+                {
+                  "text_th": "Source × Metric Matrix — ถ้า source X เปลี่ยน กระทบ metric ไหน",
+                  "text_en": "Source × Metric Matrix — if source X changes, which metrics are affected"
+                },
+                {
+                  "text_th": "Source × Dashboard Matrix — ถ้า source X เปลี่ยน กระทบ dashboard ไหน",
+                  "text_en": "Source × Dashboard Matrix — if source X changes, which dashboards are affected"
+                },
+                {
+                  "text_th": "Blast Radius Score — ประเมิน severity ของ impact ต่อ source",
+                  "text_en": "Blast Radius Score — severity rating of impact per source"
+                }
+              ]
+            },
+            {
+              "id": "breaking_change_impact",
+              "heading": "Breaking Change Impact",
+              "description": {
+                "th": "ประเมินผลกระทบก่อนทำ breaking change",
+                "en": "Assess impact before making breaking changes."
+              },
+              "refs": [
+                "data_model_spec",
+                "pipeline_spec",
+                "analytics_changelog"
+              ],
+              "items": [
+                {
+                  "text_th": "Change Impact Assessment — checklist ก่อนทำ breaking change",
+                  "text_en": "Change Impact Assessment — checklist before making a breaking change"
+                },
+                {
+                  "text_th": "Downstream Consumers — list dashboards, reports, AI models ที่กระทบ",
+                  "text_en": "Downstream Consumers — list of affected dashboards, reports, AI models"
+                },
+                {
+                  "text_th": "Migration Plan — แผน migration สำหรับ downstream consumers",
+                  "text_en": "Migration Plan — migration plan for downstream consumers"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "ai_model_spec",
+          "filename": "AI_MODEL_SPEC.md",
+          "title": "AI / Model Spec",
+          "description": {
+            "th": "Model purpose, input features, output, training data และ evaluation metrics สำหรับ AI/ML models",
+            "en": "Model purpose, input features, output, training data, and evaluation metrics for AI/ML models."
+          },
+          "priority": "P2",
+          "depends_on": [
+            "data_model_spec",
+            "metric_spec",
+            "data_quality",
+            "lineage"
+          ],
+          "output_format": {
+            "type": "markdown",
+            "suggested_headings": [
+              "Model Inventory",
+              "Model Profiles",
+              "Feature Definitions",
+              "Training Data Spec",
+              "Evaluation Metrics",
+              "Deployment and Monitoring"
+            ]
+          },
+          "agent_hints": {
+            "instruction": "Generate an AI_MODEL_SPEC.md documenting every AI/ML model in the analytics stack. For each model include: purpose, input features (with column references to DATA_MODEL_SPEC.md), output format, training data source and time window, evaluation metrics and acceptance thresholds, retraining schedule, and monitoring plan (metric drift, data drift). Example: churn prediction model using customer usage features.",
+            "input_context": "Input features must reference tables and columns from DATA_MODEL_SPEC.md. Models should help automate responses to action thresholds defined in METRIC_SPEC.md.",
+            "estimated_length": "500-900 words",
+            "validation": "Each model must have: purpose, input_features[] (with column references), output_format, training_data_source, training_window, evaluation_metrics[], acceptance_thresholds, retraining_schedule, monitoring_plan."
+          },
+          "sections": [
+            {
+              "id": "model_inventory",
+              "heading": "Model Inventory",
+              "description": {
+                "th": "รายชื่อ AI/ML models ทั้งหมดพร้อม status",
+                "en": "List of all AI/ML models with their status."
+              },
+              "refs": [
+                "metric_spec"
+              ],
+              "items": [
+                {
+                  "text_th": "Model Name — ชื่อ model และ version ปัจจุบัน",
+                  "text_en": "Model Name — model name and current version"
+                },
+                {
+                  "text_th": "Model Purpose — ปัญหาที่ model นี้แก้ เช่น churn prediction",
+                  "text_en": "Model Purpose — problem the model solves, e.g. churn prediction"
+                },
+                {
+                  "text_th": "Status — production, staging, experimental, deprecated",
+                  "text_en": "Status — production, staging, experimental, or deprecated"
+                }
+              ]
+            },
+            {
+              "id": "model_profiles",
+              "heading": "Model Profiles",
+              "description": {
+                "th": "รายละเอียดของแต่ละ AI/ML model",
+                "en": "Detailed profile for each AI/ML model."
+              },
+              "refs": [
+                "data_model_spec",
+                "metric_spec"
+              ],
+              "items": [
+                {
+                  "text_th": "Output Format — รูปแบบ output เช่น probability score, classification label",
+                  "text_en": "Output Format — e.g. probability score, classification label"
+                },
+                {
+                  "text_th": "Business Action — action ที่ trigger จาก model output เช่น flag at-risk customer",
+                  "text_en": "Business Action — action triggered by model output, e.g. flag at-risk customer"
+                },
+                {
+                  "text_th": "Action Threshold Link — เชื่อมกับ action threshold ใน METRIC_SPEC.md",
+                  "text_en": "Action Threshold Link — linked to action threshold in METRIC_SPEC.md"
+                }
+              ]
+            },
+            {
+              "id": "feature_definitions",
+              "heading": "Feature Definitions",
+              "description": {
+                "th": "นิยาม input features ที่ model ใช้",
+                "en": "Definitions of input features used by models."
+              },
+              "refs": [
+                "data_model_spec"
+              ],
+              "items": [
+                {
+                  "text_th": "Feature Name — ชื่อ feature พร้อม column reference ใน DATA_MODEL_SPEC.md",
+                  "text_en": "Feature Name — feature name with column reference in DATA_MODEL_SPEC.md"
+                },
+                {
+                  "text_th": "Feature Engineering — วิธีสร้าง feature จาก raw data เช่น rolling average, lag",
+                  "text_en": "Feature Engineering — how the feature is derived, e.g. rolling average, lag"
+                },
+                {
+                  "text_th": "Data Quality Requirements — quality ที่ feature ต้องการ เช่น null rate < 1%",
+                  "text_en": "Data Quality Requirements — quality needed, e.g. null rate < 1%"
+                }
+              ]
+            },
+            {
+              "id": "training_data_spec",
+              "heading": "Training Data Spec",
+              "description": {
+                "th": "ข้อมูลที่ใช้ train model",
+                "en": "Training data specification."
+              },
+              "refs": [
+                "data_model_spec",
+                "data_quality",
+                "data_contract"
+              ],
+              "items": [
+                {
+                  "text_th": "Training Data Source — tables และ time window ที่ใช้ train",
+                  "text_en": "Training Data Source — tables and time window used for training"
+                },
+                {
+                  "text_th": "Label Definition — วิธี define label เช่น churned = no payment within 30 days",
+                  "text_en": "Label Definition — how labels are defined, e.g. churned = no payment within 30 days"
+                },
+                {
+                  "text_th": "Train/Validation/Test Split — สัดส่วนและวิธี split data",
+                  "text_en": "Train/Validation/Test Split — split ratios and methodology"
+                }
+              ]
+            },
+            {
+              "id": "evaluation_metrics",
+              "heading": "Evaluation Metrics",
+              "description": {
+                "th": "Metrics สำหรับวัดประสิทธิภาพ model",
+                "en": "Metrics for measuring model performance."
+              },
+              "refs": [
+                "metric_spec"
+              ],
+              "items": [
+                {
+                  "text_th": "Primary Metric — metric หลัก เช่น AUC, F1 score พร้อม acceptance threshold",
+                  "text_en": "Primary Metric — main metric, e.g. AUC, F1 score with acceptance threshold"
+                },
+                {
+                  "text_th": "Secondary Metrics — precision, recall, false positive rate",
+                  "text_en": "Secondary Metrics — precision, recall, false positive rate"
+                },
+                {
+                  "text_th": "Retraining Trigger — เงื่อนไขที่ trigger retraining เช่น AUC drop > 5%",
+                  "text_en": "Retraining Trigger — condition triggering retraining, e.g. AUC drop > 5%"
+                }
+              ]
+            },
+            {
+              "id": "deployment_monitoring",
+              "heading": "Deployment and Monitoring",
+              "description": {
+                "th": "วิธี deploy model และ monitor performance",
+                "en": "Model deployment and performance monitoring."
+              },
+              "refs": [
+                "data_model_spec",
+                "metric_spec"
+              ],
+              "items": [
+                {
+                  "text_th": "Deployment Target — deploy ที่ไหน เช่น batch scoring, real-time API",
+                  "text_en": "Deployment Target — where to deploy, e.g. batch scoring, real-time API"
+                },
+                {
+                  "text_th": "Retraining Schedule — retrain บ่อยแค่ไหน เช่น monthly, quarterly",
+                  "text_en": "Retraining Schedule — how often to retrain, e.g. monthly, quarterly"
+                },
+                {
+                  "text_th": "Model Drift Detection — วิธีตรวจ model drift และ data drift",
+                  "text_en": "Model Drift Detection — how to detect model drift and data drift"
+                },
+                {
+                  "text_th": "Monitoring Dashboard — dashboard สำหรับ monitor model performance",
+                  "text_en": "Monitoring Dashboard — dashboard for monitoring model performance"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "runbook",
+          "filename": "RUNBOOK.md",
+          "title": "Runbook / Incident Response",
+          "description": {
+            "th": "คู่มือ on-call สำหรับ pipeline failures, stale data, metric anomalies และ SLA breaches",
+            "en": "On-call guide for pipeline failures, stale data, metric anomalies, and SLA breaches."
+          },
+          "priority": "P0",
+          "depends_on": [
+            "pipeline_spec",
+            "sla_freshness",
+            "data_quality"
+          ],
+          "output_format": {
+            "type": "markdown",
+            "suggested_headings": [
+              "Common Failure Scenarios",
+              "Triage Checklist",
+              "Recovery Procedures",
+              "Escalation Contacts",
+              "Post-Incident Review",
+              "Retention Enforcement & Archival"
+            ]
+          },
+          "agent_hints": {
+            "instruction": "Generate a RUNBOOK.md as the on-call reference for the data team. For each common failure scenario include: trigger condition, severity (P0/P1/P2), first-response steps, root cause checklist, recovery procedure, and rollback steps. Scenarios must include: (1) pipeline fails to complete on schedule, (2) data freshness SLA breached, (3) metric value anomaly detected, (4) data quality check failure, (5) dashboard shows stale or missing data. Define escalation contacts and response time SLAs per severity. Include a post-incident review template.",
+            "input_context": "Failure scenarios must reference PIPELINE_SPEC.md and SLA_FRESHNESS.md. Metric anomaly scenarios must reference DATA_QUALITY.md thresholds.",
+            "estimated_length": "600-1000 words",
+            "validation": "Must cover at least 5 failure scenarios. Each scenario must have: trigger, severity, first_response_steps[], recovery_procedure, rollback_steps. Escalation contacts must include primary and secondary on-call. Response time SLAs must be specified per severity level."
+          },
+          "sections": [
+            {
+              "id": "failure_scenarios",
+              "heading": "Common Failure Scenarios",
+              "description": {
+                "th": "สถานการณ์ที่เกิดบ่อยและวิธี respond",
+                "en": "Frequently occurring failure scenarios and response procedures."
+              },
+              "refs": [
+                "pipeline_spec",
+                "sla_freshness",
+                "data_quality"
+              ],
+              "items": [
+                {
+                  "text_th": "Scenario — ชื่อ failure scenario เช่น 'Pipeline ไม่รันตามกำหนด'",
+                  "text_en": "Scenario — failure scenario name, e.g. 'Pipeline did not run on schedule'"
+                },
+                {
+                  "text_th": "Severity — P0 (critical), P1 (major), P2 (minor)",
+                  "text_en": "Severity — P0 (critical), P1 (major), P2 (minor)"
+                },
+                {
+                  "text_th": "First Response Steps — สิ่งแรกที่ต้องทำภายใน 15 นาทีแรก",
+                  "text_en": "First Response Steps — immediate actions to take within the first 15 minutes"
+                },
+                {
+                  "text_th": "Root Cause Checklist — สิ่งที่ต้องตรวจเพื่อหา root cause",
+                  "text_en": "Root Cause Checklist — items to inspect when diagnosing the root cause"
+                },
+                {
+                  "text_th": "Recovery Procedure — วิธีแก้ไขและ verify ว่า fix แล้ว",
+                  "text_en": "Recovery Procedure — how to fix and verify the issue is resolved"
+                }
+              ]
+            },
+            {
+              "id": "triage_checklist",
+              "heading": "Triage Checklist",
+              "description": {
+                "th": "Checklist สำหรับ triage เมื่อได้รับ alert",
+                "en": "Checklist for triaging when an alert is received."
+              },
+              "refs": [
+                "pipeline_spec",
+                "data_quality"
+              ],
+              "items": [
+                {
+                  "text_th": "Step 1: ตรวจ pipeline status — รันสำเร็จหรือไม่",
+                  "text_en": "Step 1: Check pipeline status — did it complete successfully"
+                },
+                {
+                  "text_th": "Step 2: ตรวจ data freshness — data ล่าสุดเป็นเมื่อไหร่",
+                  "text_en": "Step 2: Check data freshness — when was data last refreshed"
+                },
+                {
+                  "text_th": "Step 3: ตรวจ quality rules — มี rules ไหน fail",
+                  "text_en": "Step 3: Check quality rules — are any quality rules failing"
+                },
+                {
+                  "text_th": "Step 4: ตรวจ source system — source ยังทำงานปกติหรือไม่",
+                  "text_en": "Step 4: Check source system — is the source system operational"
+                }
+              ]
+            },
+            {
+              "id": "recovery_procedures",
+              "heading": "Recovery Procedures",
+              "description": {
+                "th": "ขั้นตอนกู้คืนระบบหลังจาก identify root cause",
+                "en": "Steps to recover the system after identifying the root cause."
+              },
+              "refs": [
+                "pipeline_spec",
+                "sla_freshness"
+              ],
+              "items": [
+                {
+                  "text_th": "Pipeline Rerun — วิธี rerun pipeline ที่ fail",
+                  "text_en": "Pipeline Rerun — how to rerun a failed pipeline"
+                },
+                {
+                  "text_th": "Data Backfill — วิธี backfill data ที่หายไป",
+                  "text_en": "Data Backfill — how to backfill missing data"
+                },
+                {
+                  "text_th": "Rollback Procedure — วิธี rollback เมื่อ bad data เข้า production",
+                  "text_en": "Rollback Procedure — how to rollback when bad data enters production"
+                },
+                {
+                  "text_th": "Verification — ตรวจว่า recovery สำเร็จก่อนปิด incident",
+                  "text_en": "Verification — verify recovery is successful before closing the incident"
+                }
+              ]
+            },
+            {
+              "id": "escalation_contacts",
+              "heading": "Escalation Contacts",
+              "description": {
+                "th": "รายชื่อผู้รับผิดชอบแต่ละ pipeline และ escalation path",
+                "en": "Responsible persons per pipeline and escalation path."
+              },
+              "refs": [
+                "pipeline_spec",
+                "sla_freshness"
+              ],
+              "items": [
+                {
+                  "text_th": "Primary On-call — คนแรกที่รับ alert พร้อม contact",
+                  "text_en": "Primary On-call — first responder with contact details"
+                },
+                {
+                  "text_th": "Secondary On-call — backup เมื่อ primary ไม่ตอบภายใน 30 นาที",
+                  "text_en": "Secondary On-call — backup when primary is unreachable within 30 minutes"
+                },
+                {
+                  "text_th": "Response Time SLA — เวลา respond ตาม severity เช่น P0 = 15 นาที",
+                  "text_en": "Response Time SLA — response time per severity, e.g. P0 = 15 minutes"
+                }
+              ]
+            },
+            {
+              "id": "post_incident_review",
+              "heading": "Post-Incident Review",
+              "description": {
+                "th": "Template สำหรับ post-incident review หลังเกิด incident",
+                "en": "Template for post-incident review after an incident."
+              },
+              "refs": [
+                "pipeline_spec"
+              ],
+              "items": [
+                {
+                  "text_th": "Incident Summary — สรุปสั้นๆ ว่าเกิดอะไร เมื่อไหร่ กระทบอะไร",
+                  "text_en": "Incident Summary — brief summary of what happened, when, and what was affected"
+                },
+                {
+                  "text_th": "Root Cause — สาเหตุที่แท้จริงของ incident",
+                  "text_en": "Root Cause — true root cause of the incident"
+                },
+                {
+                  "text_th": "Action Items — สิ่งที่ต้องทำเพื่อป้องกันไม่ให้เกิดซ้ำ",
+                  "text_en": "Action Items — follow-up actions to prevent recurrence"
+                }
+              ]
+            },
+            {
+              "id": "retention_enforcement",
+              "heading": "Retention Enforcement & Archival",
+              "description": {
+                "th": "ขั้นตอนปฏิบัติที่บังคับ Data Retention Policy จาก DATA_GOVERNANCE.md",
+                "en": "Operational procedures enforcing the DATA_GOVERNANCE.md retention policy."
+              },
+              "refs": [
+                "data_governance"
+              ],
+              "items": [
+                {
+                  "text_th": "Scheduled purge/archive jobs ต่อ dataset ตาม retention policy พร้อม schedule",
+                  "text_en": "Scheduled purge/archive jobs per dataset per the retention policy, with schedules"
+                },
+                {
+                  "text_th": "Archival path — cold storage format, location, restore procedure",
+                  "text_en": "Archival path — cold storage format, location, restore procedure"
+                },
+                {
+                  "text_th": "Monitoring — alert เมื่อ purge job fail หรือ volume ผิดปกติ",
+                  "text_en": "Monitoring — alerts on purge job failure or abnormal volume"
+                },
+                {
+                  "text_th": "PDPA erasure request — ลบข้อมูล data subject ออกจาก warehouse และ archive",
+                  "text_en": "PDPA erasure requests — remove a data subject's data from warehouse and archives"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "analytics_changelog",
+          "filename": "ANALYTICS_CHANGELOG.md",
+          "title": "Analytics Changelog",
+          "description": {
+            "th": "ประวัติการเปลี่ยนแปลง metric definitions, KPI targets, pipeline logic และ dashboard layouts",
+            "en": "History of changes to metric definitions, KPI targets, pipeline logic, and dashboard layouts."
+          },
+          "priority": "P1",
+          "depends_on": [
+            "metric_spec",
+            "kpi_dictionary",
+            "pipeline_spec",
+            "data_contract"
+          ],
+          "output_format": {
+            "type": "markdown",
+            "suggested_headings": [
+              "Metric Definition Changes",
+              "KPI Target Changes",
+              "Pipeline Changes",
+              "Breaking Changes Log"
+            ]
+          },
+          "agent_hints": {
+            "instruction": "Generate an ANALYTICS_CHANGELOG.md as the audit trail for all changes to the analytics system. For each change entry include: date, change type (metric definition / KPI target / pipeline logic / dashboard / data contract), what changed (before vs after), reason for change, who approved, and whether it is a breaking change affecting downstream consumers. Maintain separate sections for metric changes (which require cross-team alignment) and pipeline/infrastructure changes (which are operational).",
+            "input_context": "This document prevents 'silent metric changes' — when a metric formula changes without notification, dashboards show different numbers and teams lose trust in data. Every change to metric_spec, kpi_dictionary, or metric_logic must be recorded here.",
+            "estimated_length": "600-900 words",
+            "validation": "Each change entry must have: date, change_type, changed_item, before_value, after_value, reason, approved_by, breaking_change (boolean). Breaking changes must reference the data_contract breaking change policy."
+          },
+          "sections": [
+            {
+              "id": "metric_changes",
+              "heading": "Metric Definition Changes",
+              "description": {
+                "th": "ประวัติการเปลี่ยนแปลง metric definitions และ formulas",
+                "en": "History of metric definition and formula changes."
+              },
+              "refs": [
+                "metric_spec",
+                "kpi_dictionary"
+              ],
+              "items": [
+                {
+                  "text_th": "Change Date — วันที่ effective ของการเปลี่ยนแปลง",
+                  "text_en": "Change Date — effective date of the change"
+                },
+                {
+                  "text_th": "Metric Changed — ชื่อ metric ที่เปลี่ยน",
+                  "text_en": "Metric Changed — name of the metric that changed"
+                },
+                {
+                  "text_th": "Before vs After — definition หรือ formula ก่อนและหลังเปลี่ยน",
+                  "text_en": "Before vs After — definition or formula before and after the change"
+                },
+                {
+                  "text_th": "Reason — เหตุผลที่ต้องเปลี่ยน เช่น business rule update, data source change",
+                  "text_en": "Reason — why the change was made, e.g. business rule update, data source change"
+                },
+                {
+                  "text_th": "Approved By — ใครเป็นผู้อนุมัติการเปลี่ยนแปลงนี้",
+                  "text_en": "Approved By — who approved this change"
+                }
+              ]
+            },
+            {
+              "id": "kpi_target_changes",
+              "heading": "KPI Target Changes",
+              "description": {
+                "th": "ประวัติการเปลี่ยนแปลง KPI targets",
+                "en": "History of KPI target changes."
+              },
+              "refs": [
+                "kpi_dictionary"
+              ],
+              "items": [
+                {
+                  "text_th": "KPI Changed — ชื่อ KPI ที่เปลี่ยน target",
+                  "text_en": "KPI Changed — name of the KPI whose target changed"
+                },
+                {
+                  "text_th": "Old Target vs New Target — เป้าหมายเดิมและใหม่",
+                  "text_en": "Old Target vs New Target — previous and new target values"
+                },
+                {
+                  "text_th": "Effective Date — วันที่ target ใหม่มีผล",
+                  "text_en": "Effective Date — date the new target takes effect"
+                },
+                {
+                  "text_th": "Reason — เหตุผลที่เปลี่ยน target เช่น market shift, new strategy",
+                  "text_en": "Reason — why the target was changed, e.g. market shift, new strategy"
+                }
+              ]
+            },
+            {
+              "id": "pipeline_changes",
+              "heading": "Pipeline Changes",
+              "description": {
+                "th": "ประวัติการเปลี่ยนแปลง pipeline logic และ infrastructure",
+                "en": "History of pipeline logic and infrastructure changes."
+              },
+              "refs": [
+                "pipeline_spec",
+                "data_contract"
+              ],
+              "items": [
+                {
+                  "text_th": "Pipeline Changed — ชื่อ pipeline ที่เปลี่ยน",
+                  "text_en": "Pipeline Changed — name of the pipeline that changed"
+                },
+                {
+                  "text_th": "Change Type — เช่น new source, schedule change, logic update",
+                  "text_en": "Change Type — e.g. new source, schedule change, logic update"
+                },
+                {
+                  "text_th": "Before vs After — การเปลี่ยนแปลง pipeline config ก่อน/หลัง",
+                  "text_en": "Before vs After — pipeline configuration before and after"
+                },
+                {
+                  "text_th": "Impact — กระทบ downstream tables/dashboards อะไรบ้าง",
+                  "text_en": "Impact — which downstream tables and dashboards are affected"
+                }
+              ]
+            },
+            {
+              "id": "breaking_changes_log",
+              "heading": "Breaking Changes Log",
+              "description": {
+                "th": "รายการ breaking changes ที่กระทบ downstream consumers",
+                "en": "Log of breaking changes affecting downstream consumers."
+              },
+              "refs": [
+                "metric_spec",
+                "pipeline_spec"
+              ],
+              "items": [
+                {
+                  "text_th": "Breaking Change — การเปลี่ยนแปลงที่ทำให้ downstream consumers ต้อง update",
+                  "text_en": "Breaking Change — change requiring downstream consumers to update"
+                },
+                {
+                  "text_th": "Affected Consumers — dashboards, reports, AI models ที่กระทบ",
+                  "text_en": "Affected Consumers — dashboards, reports, AI models affected"
+                },
+                {
+                  "text_th": "Migration Guide — วิธีที่ consumers ต้อง update พร้อม deadline",
+                  "text_en": "Migration Guide — how consumers must update with deadline"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "deliverables": {
+    "title": {
+      "th": "Deliverables",
+      "en": "Deliverables"
+    },
+    "description": {
+      "th": "สิ่งที่ต้องส่งมอบเมื่อ Data Analytics DDD เสร็จสมบูรณ์",
+      "en": "Artifacts and readiness gates required at Data Analytics DDD completion."
+    },
+    "artifacts": [
+      {
+        "id": "data_pipelines",
+        "title": {
+          "th": "Data Pipelines",
+          "en": "Data Pipelines"
+        },
+        "items": [
+          {
+            "text_th": "ETL/ELT pipelines ครบทุก source system ตาม PIPELINE_SPEC.md",
+            "text_en": "ETL/ELT pipelines covering all source systems per PIPELINE_SPEC.md"
+          },
+          {
+            "text_th": "dbt models หรือ SQL transformations ตาม METRIC_LOGIC.md",
+            "text_en": "dbt models or SQL transformations per METRIC_LOGIC.md"
+          },
+          {
+            "text_th": "Pipeline orchestration ตั้งค่า schedule และ dependency ครบ",
+            "text_en": "Pipeline orchestration with schedule and dependency configured"
+          },
+          {
+            "text_th": "Data quality checks embedded ใน pipeline ตาม DATA_QUALITY.md",
+            "text_en": "Data quality checks embedded in pipelines per DATA_QUALITY.md"
+          }
+        ]
+      },
+      {
+        "id": "analytics_outputs",
+        "title": {
+          "th": "Analytics Outputs",
+          "en": "Analytics Outputs"
+        },
+        "items": [
+          {
+            "text_th": "Dashboards ครบทุกตัวตาม DASHBOARD_SPEC.md พร้อม refresh schedule",
+            "text_en": "All dashboards per DASHBOARD_SPEC.md with refresh schedule configured"
+          },
+          {
+            "text_th": "Scheduled reports ตาม REPORT_SPEC.md ส่งถึงผู้รับตาม distribution list",
+            "text_en": "Scheduled reports per REPORT_SPEC.md delivered to distribution list"
+          },
+          {
+            "text_th": "Metric definitions consistent ระหว่าง dashboard, report และ METRIC_SPEC.md",
+            "text_en": "Metric definitions consistent across dashboards, reports, and METRIC_SPEC.md"
+          },
+          {
+            "text_th": "viz_theme.py ถูก generate ตาม VIZ_DESIGN_SPEC.md color & theme spec และ import ได้จากทุก dashboard code",
+            "text_en": "viz_theme.py generated per VIZ_DESIGN_SPEC.md color & theme spec and importable by all dashboard code"
+          }
+        ]
+      },
+      {
+        "id": "data_quality_framework",
+        "title": {
+          "th": "Data Quality Framework",
+          "en": "Data Quality Framework"
+        },
+        "items": [
+          {
+            "text_th": "Quality rules ทั้งหมดจาก DATA_QUALITY.md ถูก implement และ test แล้ว",
+            "text_en": "All quality rules from DATA_QUALITY.md implemented and tested"
+          },
+          {
+            "text_th": "Freshness monitoring ตาม SLA_FRESHNESS.md ทำงานได้",
+            "text_en": "Freshness monitoring per SLA_FRESHNESS.md operational"
+          },
+          {
+            "text_th": "Alert และ escalation procedures ทดสอบแล้ว",
+            "text_en": "Alert and escalation procedures tested"
+          },
+          {
+            "text_th": "Tests ทั้งหมดจาก TESTING_STRATEGY.md ผ่าน (unit, integration, metric validation)",
+            "text_en": "All tests from TESTING_STRATEGY.md pass (unit, integration, metric validation)"
+          }
+        ]
+      },
+      {
+        "id": "operational_docs",
+        "title": {
+          "th": "Operational Documentation",
+          "en": "Operational Documentation"
+        },
+        "items": [
+          {
+            "text_th": "RUNBOOK.md reviewed และ approved จาก on-call team",
+            "text_en": "RUNBOOK.md reviewed and approved by on-call team"
+          },
+          {
+            "text_th": "Escalation contacts และ response time SLAs อัพเดตและถูกต้อง",
+            "text_en": "Escalation contacts and response time SLAs up-to-date and accurate"
+          },
+          {
+            "text_th": "ANALYTICS_CHANGELOG.md initialized พร้อม template สำหรับ change entries",
+            "text_en": "ANALYTICS_CHANGELOG.md initialized with template for change entries"
+          },
+          {
+            "text_th": "STAKEHOLDERS.md approved จาก business stakeholders และ data team",
+            "text_en": "STAKEHOLDERS.md approved by business stakeholders and data team"
+          }
+        ]
+      },
+      {
+        "id": "governance_documentation",
+        "title": {
+          "th": "Governance Documentation",
+          "en": "Governance Documentation"
+        },
+        "items": [
+          {
+            "text_th": "DATA_GOVERNANCE.md ผ่านการ review จาก Legal/Compliance team",
+            "text_en": "DATA_GOVERNANCE.md reviewed and approved by Legal/Compliance team"
+          },
+          {
+            "text_th": "LINEAGE.md ครบทุก metric พร้อม impact analysis",
+            "text_en": "LINEAGE.md complete for all metrics with impact analysis"
+          },
+          {
+            "text_th": "Data contracts signed off ระหว่าง Product และ Data teams",
+            "text_en": "Data contracts signed off between Product and Data teams"
+          },
+          {
+            "text_th": "KPI Dictionary และ Business Glossary approved จาก business stakeholders",
+            "text_en": "KPI Dictionary and Business Glossary approved by business stakeholders"
+          },
+          {
+            "text_th": "ไม่มี credential hardcode ใน pipeline code/repo — ทุก connection ใช้ secret store พร้อม rotation policy",
+            "text_en": "No credentials hardcoded in pipeline code/repo — every connection uses a secret store with a rotation policy",
+            "refs": [
+              "pipeline_spec"
+            ]
+          }
+        ]
+      }
+    ],
+    "readiness_gates": [
+      {
+        "id": "data_quality_readiness",
+        "title": {
+          "th": "Data Quality Readiness",
+          "en": "Data Quality Readiness"
+        },
+        "checklist": [
+          {
+            "text_th": "Null rate ของ required fields < 0.1% ทุก pipeline",
+            "text_en": "Null rate for required fields < 0.1% across all pipelines",
+            "refs": [
+              "data_quality"
+            ]
+          },
+          {
+            "text_th": "Range checks ผ่านทุก fact table ไม่มี invalid values",
+            "text_en": "Range checks pass on all fact tables with no invalid values",
+            "refs": [
+              "data_quality"
+            ]
+          },
+          {
+            "text_th": "Anomaly detection rules ทำงานและ alert ได้ถูกต้อง",
+            "text_en": "Anomaly detection rules active and alerting correctly",
+            "refs": [
+              "data_quality"
+            ]
+          },
+          {
+            "text_th": "Referential integrity ผ่านครบทุก foreign key",
+            "text_en": "Referential integrity passes for all foreign key relationships",
+            "refs": [
+              "data_model_spec"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "pipeline_readiness",
+        "title": {
+          "th": "Pipeline Readiness",
+          "en": "Pipeline Readiness"
+        },
+        "checklist": [
+          {
+            "text_th": "Pipelines ทั้งหมดรันครบ 1 full cycle โดยไม่มี error",
+            "text_en": "All pipelines complete one full cycle without errors",
+            "refs": [
+              "pipeline_spec"
+            ]
+          },
+          {
+            "text_th": "Freshness SLA ผ่านทุก dataset ตาม SLA_FRESHNESS.md",
+            "text_en": "Freshness SLA met for all datasets per SLA_FRESHNESS.md",
+            "refs": [
+              "sla_freshness"
+            ]
+          },
+          {
+            "text_th": "Error handling และ retry ทดสอบ failure scenario แล้ว",
+            "text_en": "Error handling and retry tested with failure scenarios",
+            "refs": [
+              "pipeline_spec"
+            ]
+          },
+          {
+            "text_th": "Metric values cross-check ระหว่าง pipeline output และ METRIC_SPEC.md formula",
+            "text_en": "Metric values cross-checked between pipeline output and METRIC_SPEC.md formulas",
+            "refs": [
+              "metric_spec",
+              "metric_logic"
+            ]
+          },
+          {
+            "text_th": "Data contracts sign-off ระหว่าง Product และ Data teams เรียบร้อยแล้ว",
+            "text_en": "Data contracts signed off between Product and Data teams",
+            "refs": [
+              "data_contract"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "governance_readiness",
+        "title": {
+          "th": "Governance & Compliance Readiness",
+          "en": "Governance & Compliance Readiness"
+        },
+        "checklist": [
+          {
+            "text_th": "ทุก dataset มี named Data Owner และ Data Steward",
+            "text_en": "Every dataset has a named Data Owner and Data Steward",
+            "refs": [
+              "data_governance"
+            ]
+          },
+          {
+            "text_th": "PDPA/PII classification ครบทุก column ใน DATA_MODEL_SPEC.md",
+            "text_en": "PDPA/PII classification complete for every column in DATA_MODEL_SPEC.md",
+            "refs": [
+              "data_governance",
+              "data_model_spec"
+            ]
+          },
+          {
+            "text_th": "Access control policy implement และ test แล้ว",
+            "text_en": "Access control policy implemented and tested",
+            "refs": [
+              "data_governance"
+            ]
+          },
+          {
+            "text_th": "Lineage traces ครบทุก metric จาก source ถึง dashboard",
+            "text_en": "Lineage traces complete for all metrics from source to dashboard",
+            "refs": [
+              "lineage"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "testing_readiness",
+        "title": {
+          "th": "Testing Readiness",
+          "en": "Testing Readiness"
+        },
+        "checklist": [
+          {
+            "text_th": "dbt schema tests (not_null, unique, accepted_values) ผ่านทุก model",
+            "text_en": "dbt schema tests (not_null, unique, accepted_values) pass on all models",
+            "refs": [
+              "testing_strategy"
+            ]
+          },
+          {
+            "text_th": "Integration tests รัน full pipeline cycle สำเร็จ",
+            "text_en": "Integration tests complete a full pipeline cycle successfully",
+            "refs": [
+              "testing_strategy",
+              "pipeline_spec"
+            ]
+          },
+          {
+            "text_th": "Metric validation tests cross-check ค่ากับ golden dataset",
+            "text_en": "Metric validation tests cross-check values against golden dataset",
+            "refs": [
+              "testing_strategy",
+              "metric_logic"
+            ]
+          },
+          {
+            "text_th": "CI/CD pipeline block deployment เมื่อ test fail",
+            "text_en": "CI/CD pipeline blocks deployment when tests fail",
+            "refs": [
+              "testing_strategy"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "operational_readiness",
+        "title": {
+          "th": "Operational Readiness",
+          "en": "Operational Readiness"
+        },
+        "checklist": [
+          {
+            "text_th": "Runbook reviewed จาก on-call team ครบทุก failure scenario",
+            "text_en": "Runbook reviewed by on-call team covering all failure scenarios",
+            "refs": [
+              "runbook"
+            ]
+          },
+          {
+            "text_th": "Escalation contacts อัพเดตและ verified ว่าติดต่อได้จริง",
+            "text_en": "Escalation contacts updated and verified reachable",
+            "refs": [
+              "runbook"
+            ]
+          },
+          {
+            "text_th": "Post-incident review template พร้อมใช้งาน",
+            "text_en": "Post-incident review template ready for use",
+            "refs": [
+              "runbook"
+            ]
+          },
+          {
+            "text_th": "Analytics Changelog initialized พร้อม process สำหรับ record changes",
+            "text_en": "Analytics Changelog initialized with process for recording changes",
+            "refs": [
+              "analytics_changelog"
+            ]
+          },
+          {
+            "text_th": "Cost monitoring dashboard live พร้อม alert thresholds และ retention purge jobs scheduled ตาม runbook",
+            "text_en": "Cost monitoring dashboard live with alert thresholds; retention purge jobs scheduled per the runbook",
+            "refs": [
+              "data_governance",
+              "runbook"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "business_readiness",
+        "title": {
+          "th": "Business Readiness",
+          "en": "Business Readiness"
+        },
+        "checklist": [
+          {
+            "text_th": "Stakeholders ทุกกลุ่มถูกระบุและ approved data needs",
+            "text_en": "All stakeholder groups identified and their data needs approved",
+            "refs": [
+              "stakeholders"
+            ]
+          },
+          {
+            "text_th": "KPI Dictionary approved จาก CEO / Business stakeholders",
+            "text_en": "KPI Dictionary approved by CEO and business stakeholders",
+            "refs": [
+              "kpi_dictionary"
+            ]
+          },
+          {
+            "text_th": "Business Glossary reviewed และ agreed โดยทุก team",
+            "text_en": "Business Glossary reviewed and agreed upon by all teams",
+            "refs": [
+              "business_glossary"
+            ]
+          },
+          {
+            "text_th": "Dashboard sign-off จาก target users (CEO, CSM, Finance)",
+            "text_en": "Dashboard sign-off from target users (CEO, CSM, Finance)",
+            "refs": [
+              "dashboard_spec"
+            ]
+          },
+          {
+            "text_th": "Data consumers เข้าใจ metric definitions และ action thresholds",
+            "text_en": "Data consumers understand metric definitions and action thresholds",
+            "refs": [
+              "metric_spec"
+            ]
+          },
+          {
+            "text_th": "Scheduled reports ส่งถึงผู้รับตาม distribution list ครบทุกฉบับ",
+            "text_en": "Scheduled reports delivered to all recipients per distribution list",
+            "refs": [
+              "report_spec"
+            ]
+          },
+          {
+            "text_th": "AI/ML models ผ่าน evaluation metrics ตาม acceptance thresholds",
+            "text_en": "AI/ML models pass evaluation metrics per acceptance thresholds",
+            "refs": [
+              "ai_model_spec"
+            ]
+          },
+          {
+            "text_th": "Chart type ของทุก dashboard chart ตรงกับ viz_design_spec.chart_type_matrix",
+            "text_en": "Chart type for every dashboard chart matches viz_design_spec.chart_type_matrix",
+            "refs": [
+              "viz_design_spec",
+              "dashboard_spec"
+            ]
+          },
+          {
+            "text_th": "Advanced viz (crosshair, animation) ใช้เฉพาะกับ stakeholder ที่มี data_literacy_level >= intermediate",
+            "text_en": "Advanced viz (crosshair, animation) used only for stakeholders with data_literacy_level >= intermediate",
+            "refs": [
+              "viz_design_spec",
+              "stakeholders"
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}
